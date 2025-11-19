@@ -1,5 +1,5 @@
 # === General ===
-# Ignora artefactos de build y configuraciones locales, conserva solo código fuente y configuraciones necesarias.
+# Ignora artefactos de build y configuraciones locales, conserva solo código fuente necesario.
 
 # Compilación / Artefactos
 bin/
@@ -85,7 +85,7 @@ TestResults/
 *.svclog
 *.etl
 
-# Configuraciones locales adicionales (mantén solo appsettings.json base)
+# Configuraciones locales (mantener solo appsettings.json base)
 appsettings.*.json
 !appsettings.json
 
@@ -113,14 +113,11 @@ $RECYCLE.BIN/
 *.tlog
 *.out
 
-# Mantener explícitamente código y archivos de configuración necesarios
+# Mantener código fuente y archivos de proyecto
 !**/*.cs
 !**/*.csproj
 !**/*.sln
-!**/*.json
-!**/*.xml
-!**/*.yml
-!**/*.yaml
-!**/*.config
-!**/*.props
-!**/*.targets
+!**/*.editorconfig
+!**/*.gitignore
+
+# (Se eliminan las excepciones globales para *.json, *.xml, etc. para que los .json dentro de obj/ queden ignorados)
