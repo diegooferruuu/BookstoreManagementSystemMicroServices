@@ -75,8 +75,7 @@ namespace MicroServiceUsers.Domain.Validations
                     yield return new ValidationError(nameof(u.MiddleName), "El segundo nombre solo puede contener letras.");
             }
 
-            if (string.IsNullOrWhiteSpace(u.PasswordHash))
-                yield return new ValidationError(nameof(u.PasswordHash), "El hash de contraseña es obligatorio.");
+            // PasswordHash no se valida aquí ya que se genera automáticamente
         }
 
         public static Result ValidateAsResult(User u)

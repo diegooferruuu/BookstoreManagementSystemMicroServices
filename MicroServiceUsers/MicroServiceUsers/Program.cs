@@ -5,6 +5,7 @@ using MicroServiceUsers.Infrastructure.DataBase;
 using MicroServiceUsers.Infrastructure.Repositories;
 using MicroServiceUsers.Infrastructure.Auth;
 using MicroServiceUsers.Infrastructure.Security;
+using MicroServiceUsers.Infrastructure.Email;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -19,6 +20,11 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 var jwtOptions = new JwtOptions();
 builder.Configuration.GetSection("Jwt").Bind(jwtOptions);
 builder.Services.AddSingleton(jwtOptions);
+
+// Configuración SendGrid
+var sendGridOptions = new SendGridOptions();
+builder.Configuration.GetSection("SendGrid").Bind(sendGridOptions);
+builder.Services.AddSingleton(sendGridOptions);
 
 // Autenticación JWT
 builder.Services.AddAuthentication(options =>
@@ -43,6 +49,7 @@ builder.Services.AddAuthentication(options =>
 // Registro de dependencias
 builder.Services.AddSingleton<IDataBase>(sp => DataBaseConnection.GetInstance(connectionString));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 
 // Servicios de autenticación y generación
@@ -50,6 +57,12 @@ builder.Services.AddScoped<ITokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IJwtAuthService, JwtAuthService>();
 builder.Services.AddScoped<IPasswordGenerator, SecurePasswordGenerator>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGenerator>();
+builder.Services.AddScoped<IEmailService>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<SendGridEmailService>>();
+    var options = sp.GetRequiredService<SendGridOptions>();
+    return new SendGridEmailService(options, logger);
+});
 
 // Fachada
 builder.Services.AddScoped<IUserFacade, UserFacade>();
@@ -60,6 +73,17 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Seed de la base de datos
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var userRepository = services.GetRequiredService<IUserRepository>();
+    var logger = services.GetRequiredService<ILogger<DatabaseSeeder>>();
+    
+    var seeder = new DatabaseSeeder(userRepository, logger);
+    await seeder.SeedAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

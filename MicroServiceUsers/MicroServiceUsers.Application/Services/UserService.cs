@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MicroServiceUsers.Application.Services
@@ -18,34 +19,39 @@ namespace MicroServiceUsers.Application.Services
             _repository = repository;
         }
 
-        public List<User> GetAll() => _repository.GetAll();
+        public Task<List<User>> GetAllAsync(CancellationToken ct = default) 
+            => _repository.GetAllAsync(ct);
 
-        public User? Read(Guid id) => _repository.Read(id);
+        public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default) 
+            => _repository.GetByIdAsync(id, ct);
 
-        public void Create(User user)
+        public Task<User?> GetByUserOrEmailAsync(string userOrEmail, CancellationToken ct = default) 
+            => _repository.GetByUserOrEmailAsync(userOrEmail, ct);
+
+        public Task<List<string>> GetRolesAsync(Guid userId, CancellationToken ct = default) 
+            => _repository.GetRolesAsync(userId, ct);
+
+        public async Task CreateAsync(User user, string password, List<string> roles, CancellationToken ct = default)
         {
             var errors = UserValidation.Validate(user).ToList();
             if (errors.Any())
                 throw new ValidationException(errors);
 
             UserValidation.Normalize(user);
-            _repository.Create(user);
+            await _repository.CreateAsync(user, password, roles, ct);
         }
 
-        public void Update(User user)
+        public async Task UpdateAsync(User user, CancellationToken ct = default)
         {
             var errors = UserValidation.Validate(user).ToList();
             if (errors.Any())
                 throw new ValidationException(errors);
 
             UserValidation.Normalize(user);
-            _repository.Update(user);
+            await _repository.UpdateAsync(user, ct);
         }
 
-        public void Delete(Guid id) => _repository.Delete(id);
-
-        public User? GetByUsername(string username) => _repository.GetByUsername(username);
-
-        public User? GetByEmail(string email) => _repository.GetByEmail(email);
+        public Task DeleteAsync(Guid id, CancellationToken ct = default) 
+            => _repository.DeleteAsync(id, ct);
     }
 }
