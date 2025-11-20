@@ -27,9 +27,10 @@ namespace MicroServiceUsers.Application.Facade
         public async Task<UserReadDto> CreateUserAsync(UserCreateDto dto, CancellationToken ct = default)
         {
             var baseUsername = _unameGen.GenerateUsernameFromEmail(dto.Email);
+            var allUsers = await _users.GetAllAsync(ct);
             var uniqueUsername = _unameGen.EnsureUniqueUsername(
                 baseUsername,
-                u => _users.GetAll().Any(x => x.Username.Equals(u, StringComparison.OrdinalIgnoreCase)));
+                u => allUsers.Any(x => x.Username.Equals(u, StringComparison.OrdinalIgnoreCase)));
 
             var plainPassword = _pwdGen.GenerateSecurePassword();
 
@@ -41,14 +42,15 @@ namespace MicroServiceUsers.Application.Facade
             {
                 Email = dto.Email.Trim().ToLowerInvariant(),
                 Username = uniqueUsername,
-                FirstName = null,
-                LastName = null,
+                FirstName = string.Empty,
+                LastName = string.Empty,
                 PasswordHash = hash,
                 IsActive = true,
                 MustChangePassword = true
             };
 
-            _users.Create(user);
+            var roles = new List<string> { dto.Role };
+            await _users.CreateAsync(user, plainPassword, roles, ct);
 
             // TODO: Enviar email con credenciales
             // var html = $"<p>Usuario: <b>{uniqueUsername}</b></p><p>Contraseña: <b>{plainPassword}</b></p>";
@@ -85,20 +87,24 @@ namespace MicroServiceUsers.Application.Facade
             };
         }
 
-        public Task<IReadOnlyList<UserReadDto>> GetAllAsync(CancellationToken ct = default)
+        public async Task<IReadOnlyList<UserReadDto>> GetAllAsync(CancellationToken ct = default)
         {
-            var list = _users.GetAll()
-                .Select(u => new UserReadDto
+            var allUsers = await _users.GetAllAsync(ct);
+            var result = new List<UserReadDto>();
+
+            foreach (var u in allUsers)
+            {
+                var roles = await _users.GetRolesAsync(u.Id, ct);
+                result.Add(new UserReadDto
                 {
                     Id = u.Id,
                     Username = u.Username,
                     Email = u.Email,
-                    Roles = new[] { "User" } // Por ahora roles básicos
-                })
-                .ToList()
-                .AsReadOnly();
+                    Roles = roles.ToArray()
+                });
+            }
 
-            return Task.FromResult((IReadOnlyList<UserReadDto>)list);
+            return result.AsReadOnly();
         }
     }
 }

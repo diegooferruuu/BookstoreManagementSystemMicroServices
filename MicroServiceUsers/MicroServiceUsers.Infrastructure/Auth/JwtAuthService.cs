@@ -22,10 +22,7 @@ namespace MicroServiceUsers.Infrastructure.Auth
 
         public async Task<Result<object>> SignInAsync(string userOrEmail, string password, CancellationToken ct = default)
         {
-            var input = (userOrEmail ?? string.Empty).Trim().ToLowerInvariant();
-            
-            // Intentar buscar por username o email
-            var user = _users.GetByUsername(input) ?? _users.GetByEmail(input);
+            var user = await _users.GetByUserOrEmailAsync(userOrEmail, ct);
 
             if (user is null || !user.IsActive)
                 return Result<object>.Fail(new ValidationError("Credentials", "Credenciales inválidas."));
@@ -39,8 +36,11 @@ namespace MicroServiceUsers.Infrastructure.Auth
                 return Result<object>.Fail(new ValidationError("MustChangePassword", "Debe cambiar su contraseña antes de continuar."));
             }
 
-            // Por ahora, asignamos roles básicos (esto se puede expandir con una tabla de roles)
-            var roles = new List<string> { "User" };
+            // Obtener roles del usuario desde la base de datos
+            var roles = await _users.GetRolesAsync(user.Id, ct);
+            if (!roles.Any())
+                roles = new List<string> { "User" };
+
             var now = DateTimeOffset.UtcNow;
             var jwt = _tokens.CreateToken(user, roles, now, _options);
 

@@ -1,10 +1,12 @@
 using MicroServiceUsers.Domain.Interfaces;
 using MicroServiceUsers.Domain.Models;
+using Microsoft.AspNetCore.Identity;
 using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MicroServiceUsers.Infrastructure.Repositories
@@ -18,186 +20,200 @@ namespace MicroServiceUsers.Infrastructure.Repositories
             _database = database;
         }
 
-        public List<User> GetAll()
+        public async Task<User?> GetByUserOrEmailAsync(string userOrEmail, CancellationToken ct = default)
+        {
+            var input = (userOrEmail ?? string.Empty).Trim().ToLowerInvariant();
+
+            var sql = @"SELECT id, username, email, first_name, last_name, middle_name, 
+                               password_hash, is_active, must_change_password 
+                        FROM users 
+                        WHERE (LOWER(username)=@ue OR LOWER(email)=@ue) 
+                        LIMIT 1";
+
+            await using var conn = _database.GetConnection();
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@ue", input);
+
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (await reader.ReadAsync(ct))
+            {
+                return new User
+                {
+                    Id = reader.GetGuid(0),
+                    Username = reader.GetString(1),
+                    Email = reader.GetString(2),
+                    FirstName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    LastName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                    MiddleName = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    PasswordHash = reader.GetString(6),
+                    IsActive = reader.GetBoolean(7),
+                    MustChangePassword = reader.IsDBNull(8) ? false : reader.GetBoolean(8)
+                };
+            }
+            return null;
+        }
+
+        public async Task<List<string>> GetRolesAsync(Guid userId, CancellationToken ct = default)
+        {
+            var roles = new List<string>();
+            var sql = @"SELECT r.name 
+                        FROM roles r 
+                        JOIN user_roles ur ON ur.role_id = r.id 
+                        WHERE ur.user_id = @id";
+
+            await using var conn = _database.GetConnection();
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", userId);
+
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+                roles.Add(reader.GetString(0));
+
+            return roles;
+        }
+
+        public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        {
+            var sql = @"SELECT id, username, email, first_name, last_name, middle_name, 
+                               password_hash, is_active, must_change_password 
+                        FROM users WHERE id = @id";
+
+            await using var conn = _database.GetConnection();
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", id);
+
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (await reader.ReadAsync(ct))
+            {
+                return new User
+                {
+                    Id = reader.GetGuid(0),
+                    Username = reader.GetString(1),
+                    Email = reader.GetString(2),
+                    FirstName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    LastName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                    MiddleName = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    PasswordHash = reader.GetString(6),
+                    IsActive = reader.GetBoolean(7),
+                    MustChangePassword = reader.IsDBNull(8) ? false : reader.GetBoolean(8)
+                };
+            }
+            return null;
+        }
+
+        public async Task<List<User>> GetAllAsync(CancellationToken ct = default)
         {
             var users = new List<User>();
-            using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand(@"
-                SELECT id, username, email, first_name, last_name, middle_name, 
-                       password_hash, is_active, must_change_password, created_at 
-                FROM users 
-                WHERE is_active = TRUE 
-                ORDER BY last_name, first_name", conn);
-            using var reader = cmd.ExecuteReader();
 
-            while (reader.Read())
+            var sql = @"SELECT id, username, email, first_name, last_name, middle_name, 
+                               password_hash, is_active, must_change_password 
+                        FROM users 
+                        WHERE is_active = TRUE 
+                        ORDER BY id";
+
+            await using var conn = _database.GetConnection();
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+            while (await reader.ReadAsync(ct))
             {
                 users.Add(new User
                 {
-                    Id = reader.GetGuid(reader.GetOrdinal("id")),
-                    Username = reader.GetString(reader.GetOrdinal("username")),
-                    Email = reader.GetString(reader.GetOrdinal("email")),
-                    FirstName = reader.IsDBNull(reader.GetOrdinal("first_name")) ? null : reader.GetString(reader.GetOrdinal("first_name")),
-                    LastName = reader.IsDBNull(reader.GetOrdinal("last_name")) ? null : reader.GetString(reader.GetOrdinal("last_name")),
-                    MiddleName = reader.IsDBNull(reader.GetOrdinal("middle_name")) ? null : reader.GetString(reader.GetOrdinal("middle_name")),
-                    PasswordHash = reader.GetString(reader.GetOrdinal("password_hash")),
-                    IsActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
-                    MustChangePassword = reader.GetBoolean(reader.GetOrdinal("must_change_password")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+                    Id = reader.GetGuid(0),
+                    Username = reader.GetString(1),
+                    Email = reader.GetString(2),
+                    FirstName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    LastName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                    MiddleName = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    PasswordHash = reader.GetString(6),
+                    IsActive = reader.GetBoolean(7),
+                    MustChangePassword = reader.IsDBNull(8) ? false : reader.GetBoolean(8)
                 });
             }
 
             return users;
         }
 
-        public User? Read(Guid id)
+        public async Task CreateAsync(User user, string password, List<string> roles, CancellationToken ct = default)
         {
-            using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand(@"
-                SELECT id, username, email, first_name, last_name, middle_name, 
-                       password_hash, is_active, must_change_password, created_at 
-                FROM users 
-                WHERE id = @id", conn);
-            cmd.Parameters.AddWithValue("@id", NpgsqlTypes.NpgsqlDbType.Uuid, id);
+            // Hashear el password
+            var hasher = new PasswordHasher<User>();
+            user.PasswordHash = hasher.HashPassword(user, password);
 
-            using var reader = cmd.ExecuteReader();
-            if (reader.Read())
-            {
-                return new User
-                {
-                    Id = reader.GetGuid(reader.GetOrdinal("id")),
-                    Username = reader.GetString(reader.GetOrdinal("username")),
-                    Email = reader.GetString(reader.GetOrdinal("email")),
-                    FirstName = reader.IsDBNull(reader.GetOrdinal("first_name")) ? null : reader.GetString(reader.GetOrdinal("first_name")),
-                    LastName = reader.IsDBNull(reader.GetOrdinal("last_name")) ? null : reader.GetString(reader.GetOrdinal("last_name")),
-                    MiddleName = reader.IsDBNull(reader.GetOrdinal("middle_name")) ? null : reader.GetString(reader.GetOrdinal("middle_name")),
-                    PasswordHash = reader.GetString(reader.GetOrdinal("password_hash")),
-                    IsActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
-                    MustChangePassword = reader.GetBoolean(reader.GetOrdinal("must_change_password")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
-                };
-            }
+            var sql = @"INSERT INTO users 
+                        (id, username, email, first_name, last_name, middle_name, 
+                         password_hash, is_active, must_change_password)
+                        VALUES 
+                        (@id, @username, @email, @firstName, @lastName, @middleName, 
+                         @passwordHash, @isActive, @mustChange)";
 
-            return null;
-        }
+            await using var conn = _database.GetConnection();
+            await using var cmd = new NpgsqlCommand(sql, conn);
 
-        public void Create(User user)
-        {
-            using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand(@"
-                INSERT INTO users (username, email, first_name, last_name, middle_name, 
-                                   password_hash, is_active, must_change_password)
-                VALUES (@username, @email, @first_name, @last_name, @middle_name, 
-                        @password_hash, @is_active, @must_change_password)", conn);
+            var newId = Guid.NewGuid();
+            user.Id = newId;
 
+            cmd.Parameters.AddWithValue("@id", newId);
             cmd.Parameters.AddWithValue("@username", user.Username);
             cmd.Parameters.AddWithValue("@email", user.Email);
-            cmd.Parameters.AddWithValue("@first_name", user.FirstName ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@last_name", user.LastName ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@middle_name", user.MiddleName ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@password_hash", user.PasswordHash);
-            cmd.Parameters.AddWithValue("@is_active", user.IsActive);
-            cmd.Parameters.AddWithValue("@must_change_password", user.MustChangePassword);
+            cmd.Parameters.AddWithValue("@firstName", user.FirstName ?? string.Empty);
+            cmd.Parameters.AddWithValue("@lastName", user.LastName ?? string.Empty);
+            cmd.Parameters.AddWithValue("@middleName", (object?)user.MiddleName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@passwordHash", user.PasswordHash);
+            cmd.Parameters.AddWithValue("@isActive", user.IsActive);
+            cmd.Parameters.AddWithValue("@mustChange", user.MustChangePassword);
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync(ct);
+
+            foreach (var roleName in roles)
+            {
+                var insertSql = @"INSERT INTO user_roles (user_id, role_id) 
+                                  SELECT @userId, r.id FROM roles r WHERE r.name = @roleName";
+                await using var roleCmd = new NpgsqlCommand(insertSql, conn);
+                roleCmd.Parameters.AddWithValue("@userId", newId);
+                roleCmd.Parameters.AddWithValue("@roleName", roleName);
+                await roleCmd.ExecuteNonQueryAsync(ct);
+            }
         }
 
-        public void Update(User user)
+        public async Task UpdateAsync(User user, CancellationToken ct = default)
         {
-            using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand(@"
-                UPDATE users SET 
-                    username = @username,
-                    email = @email,
-                    first_name = @first_name,
-                    last_name = @last_name,
-                    middle_name = @middle_name,
-                    password_hash = @password_hash,
-                    is_active = @is_active,
-                    must_change_password = @must_change_password
-                WHERE id = @id", conn);
+            var sql = @"UPDATE users 
+                        SET username = @username, 
+                            email = @email, 
+                            first_name = @firstName, 
+                            last_name = @lastName, 
+                            middle_name = @middleName, 
+                            password_hash = @passwordHash, 
+                            is_active = @isActive, 
+                            must_change_password = @mustChange
+                        WHERE id = @id";
+
+            await using var conn = _database.GetConnection();
+            await using var cmd = new NpgsqlCommand(sql, conn);
 
             cmd.Parameters.AddWithValue("@id", user.Id);
             cmd.Parameters.AddWithValue("@username", user.Username);
             cmd.Parameters.AddWithValue("@email", user.Email);
-            cmd.Parameters.AddWithValue("@first_name", user.FirstName ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@last_name", user.LastName ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@middle_name", user.MiddleName ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@password_hash", user.PasswordHash);
-            cmd.Parameters.AddWithValue("@is_active", user.IsActive);
-            cmd.Parameters.AddWithValue("@must_change_password", user.MustChangePassword);
+            cmd.Parameters.AddWithValue("@firstName", user.FirstName ?? string.Empty);
+            cmd.Parameters.AddWithValue("@lastName", user.LastName ?? string.Empty);
+            cmd.Parameters.AddWithValue("@middleName", (object?)user.MiddleName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@passwordHash", user.PasswordHash);
+            cmd.Parameters.AddWithValue("@isActive", user.IsActive);
+            cmd.Parameters.AddWithValue("@mustChange", user.MustChangePassword);
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync(ct);
         }
 
-        public void Delete(Guid id)
+        public async Task DeleteAsync(Guid id, CancellationToken ct = default)
         {
-            using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand("UPDATE users SET is_active = FALSE WHERE id = @id", conn);
-            cmd.Parameters.AddWithValue("@id", NpgsqlTypes.NpgsqlDbType.Uuid, id);
-            cmd.ExecuteNonQuery();
-        }
+            var sql = "UPDATE users SET is_active = FALSE WHERE id = @id";
 
-        public User? GetByUsername(string username)
-        {
-            using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand(@"
-                SELECT id, username, email, first_name, last_name, middle_name, 
-                       password_hash, is_active, must_change_password, created_at 
-                FROM users 
-                WHERE LOWER(username) = LOWER(@username)", conn);
-            cmd.Parameters.AddWithValue("@username", username);
+            await using var conn = _database.GetConnection();
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", id);
 
-            using var reader = cmd.ExecuteReader();
-            if (reader.Read())
-            {
-                return new User
-                {
-                    Id = reader.GetGuid(reader.GetOrdinal("id")),
-                    Username = reader.GetString(reader.GetOrdinal("username")),
-                    Email = reader.GetString(reader.GetOrdinal("email")),
-                    FirstName = reader.IsDBNull(reader.GetOrdinal("first_name")) ? null : reader.GetString(reader.GetOrdinal("first_name")),
-                    LastName = reader.IsDBNull(reader.GetOrdinal("last_name")) ? null : reader.GetString(reader.GetOrdinal("last_name")),
-                    MiddleName = reader.IsDBNull(reader.GetOrdinal("middle_name")) ? null : reader.GetString(reader.GetOrdinal("middle_name")),
-                    PasswordHash = reader.GetString(reader.GetOrdinal("password_hash")),
-                    IsActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
-                    MustChangePassword = reader.GetBoolean(reader.GetOrdinal("must_change_password")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
-                };
-            }
-
-            return null;
-        }
-
-        public User? GetByEmail(string email)
-        {
-            using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand(@"
-                SELECT id, username, email, first_name, last_name, middle_name, 
-                       password_hash, is_active, must_change_password, created_at 
-                FROM users 
-                WHERE LOWER(email) = LOWER(@email)", conn);
-            cmd.Parameters.AddWithValue("@email", email);
-
-            using var reader = cmd.ExecuteReader();
-            if (reader.Read())
-            {
-                return new User
-                {
-                    Id = reader.GetGuid(reader.GetOrdinal("id")),
-                    Username = reader.GetString(reader.GetOrdinal("username")),
-                    Email = reader.GetString(reader.GetOrdinal("email")),
-                    FirstName = reader.IsDBNull(reader.GetOrdinal("first_name")) ? null : reader.GetString(reader.GetOrdinal("first_name")),
-                    LastName = reader.IsDBNull(reader.GetOrdinal("last_name")) ? null : reader.GetString(reader.GetOrdinal("last_name")),
-                    MiddleName = reader.IsDBNull(reader.GetOrdinal("middle_name")) ? null : reader.GetString(reader.GetOrdinal("middle_name")),
-                    PasswordHash = reader.GetString(reader.GetOrdinal("password_hash")),
-                    IsActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
-                    MustChangePassword = reader.GetBoolean(reader.GetOrdinal("must_change_password")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
-                };
-            }
-
-            return null;
+            await cmd.ExecuteNonQueryAsync(ct);
         }
     }
 }

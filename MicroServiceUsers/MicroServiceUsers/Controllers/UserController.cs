@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
 using MicroServiceUsers.Domain.Models;
 using MicroServiceUsers.Domain.Interfaces;
 using MicroServiceUsers.Domain.Validations;
+using System.Threading;
 
 namespace MicroServiceUsers.Controllers
 {
@@ -18,46 +20,58 @@ namespace MicroServiceUsers.Controllers
 
         // GET: api/user
         [HttpGet]
-        public ActionResult<List<User>> GetAll()
+        public async Task<ActionResult<List<User>>> GetAll(CancellationToken ct)
         {
-            var list = _service.GetAll();
+            var list = await _service.GetAllAsync(ct);
             return Ok(list);
         }
 
         // GET: api/user/{id}
         [HttpGet("{id:guid}")]
-        public ActionResult<User> GetById(Guid id)
+        public async Task<ActionResult<User>> GetById(Guid id, CancellationToken ct)
         {
-            var user = _service.Read(id);
+            var user = await _service.GetByIdAsync(id, ct);
             if (user is null) return NotFound();
             return Ok(user);
         }
 
-        // GET: api/user/username/{username}
-        [HttpGet("username/{username}")]
-        public ActionResult<User> GetByUsername(string username)
+        // GET: api/user/search/{userOrEmail}
+        [HttpGet("search/{userOrEmail}")]
+        public async Task<ActionResult<User>> GetByUserOrEmail(string userOrEmail, CancellationToken ct)
         {
-            var user = _service.GetByUsername(username);
+            var user = await _service.GetByUserOrEmailAsync(userOrEmail, ct);
             if (user is null) return NotFound();
             return Ok(user);
         }
 
-        // GET: api/user/email/{email}
-        [HttpGet("email/{email}")]
-        public ActionResult<User> GetByEmail(string email)
+        // GET: api/user/{id}/roles
+        [HttpGet("{id:guid}/roles")]
+        public async Task<ActionResult<List<string>>> GetRoles(Guid id, CancellationToken ct)
         {
-            var user = _service.GetByEmail(email);
-            if (user is null) return NotFound();
-            return Ok(user);
+            var roles = await _service.GetRolesAsync(id, ct);
+            return Ok(roles);
         }
 
         // POST: api/user
         [HttpPost]
-        public ActionResult Create([FromBody] User user)
+        public async Task<ActionResult> Create([FromBody] CreateUserRequest request, CancellationToken ct)
         {
             try
             {
-                _service.Create(user);
+                // Crear el objeto User desde el request
+                var user = new User
+                {
+                    Username = request.Username,
+                    Email = request.Email,
+                    FirstName = request.FirstName ?? string.Empty,
+                    LastName = request.LastName ?? string.Empty,
+                    MiddleName = request.MiddleName,
+                    IsActive = true,
+                    MustChangePassword = true,
+                    PasswordHash = string.Empty // Se generará en el repositorio
+                };
+
+                await _service.CreateAsync(user, request.Password, request.Roles, ct);
                 return Ok(user);
             }
             catch (ValidationException ex)
@@ -72,7 +86,7 @@ namespace MicroServiceUsers.Controllers
 
         // PUT: api/user/{id}
         [HttpPut("{id:guid}")]
-        public ActionResult Update(Guid id, [FromBody] User user)
+        public async Task<ActionResult> Update(Guid id, [FromBody] User user, CancellationToken ct)
         {
             if (user is null) return BadRequest();
 
@@ -80,7 +94,7 @@ namespace MicroServiceUsers.Controllers
 
             try
             {
-                _service.Update(user);
+                await _service.UpdateAsync(user, ct);
                 return NoContent();
             }
             catch (ValidationException ex)
@@ -95,10 +109,21 @@ namespace MicroServiceUsers.Controllers
 
         // DELETE: api/user/{id}
         [HttpDelete("{id:guid}")]
-        public ActionResult Delete(Guid id)
+        public async Task<ActionResult> Delete(Guid id, CancellationToken ct)
         {
-            _service.Delete(id);
+            await _service.DeleteAsync(id, ct);
             return NoContent();
         }
+    }
+
+    public class CreateUserRequest
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? MiddleName { get; set; }
+        public string Password { get; set; } = string.Empty;
+        public List<string> Roles { get; set; } = new();
     }
 }

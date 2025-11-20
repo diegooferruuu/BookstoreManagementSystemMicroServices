@@ -43,6 +43,7 @@ builder.Services.AddAuthentication(options =>
 // Registro de dependencias
 builder.Services.AddSingleton<IDataBase>(sp => DataBaseConnection.GetInstance(connectionString));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 
 // Servicios de autenticación y generación
