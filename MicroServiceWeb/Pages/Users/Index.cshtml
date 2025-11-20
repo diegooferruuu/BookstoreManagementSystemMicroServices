@@ -1,0 +1,86 @@
+@page
+@model LibraryWeb.Pages.Users.IndexModel
+@{
+    ViewData["Title"] = "Usuarios";
+    string TranslateRole(string? r) => (r ?? string.Empty).ToLowerInvariant() switch
+    {
+        "admin" => "Administrador",
+        "employee" => "Empleado",
+        _ => r ?? string.Empty
+    };
+}
+<div class="card shadow-custom">
+    <div class="card-header card-header-blue d-flex align-items-center justify-content-between">
+        <h5 class="mb-0"><i class="fas fa-users me-2"></i>Usuarios</h5>
+        <a asp-page="Create" class="btn btn-primary btn-sm"><i class="fas fa-user-plus me-1"></i>Añadir Usuario</a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th class="th-blue">Nombre de Usuario</th>
+                        <th class="th-blue">Correo Electrónico</th>
+                        <th class="th-blue">Roles</th>
+                        <th class="th-blue text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Model.Users)
+                    {
+                        <tr>
+                            <td>@user.Username</td>
+                            <td>@user.Email</td>
+                            <td>
+                                @if (user.Roles != null && user.Roles.Count > 0)
+                                {
+                                    foreach (var role in user.Roles)
+                                    {
+                                        <span class="badge bg-primary me-1">@TranslateRole(role)</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Sin rol</span>
+                                }
+                            </td>
+                            <td class="text-center table-actions">
+                                <button type="button" class="btn btn-danger btn-sm btn-icon" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-user-id="@user.Id">
+                                    <i class="fas fa-trash"></i> Eliminar
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Delete">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="confirmDeleteLabel">¿Confirmar eliminación?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar este usuario?
+                    <input type="hidden" id="deleteUserId" name="id" />
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    const modal = document.getElementById('confirmDeleteModal');
+    modal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const userId = button.getAttribute('data-user-id');
+      document.getElementById('deleteUserId').value = userId;
+    });
+</script>

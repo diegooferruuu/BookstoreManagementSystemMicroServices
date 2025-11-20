@@ -1,0 +1,85 @@
+@page
+@model LibraryWeb.Pages.Clients.IndexModel
+@{
+    ViewData["Title"] = "Clientes";
+}
+
+<div class="card shadow-custom">
+    <div class="card-header card-header-blue d-flex align-items-center justify-content-between">
+        <h5 class="mb-0"><i class="fas fa-users me-2"></i>Clientes</h5>
+        <a asp-page="Create" class="btn btn-primary btn-sm"><i class="fas fa-user-plus me-1"></i>Añadir Cliente</a>
+    </div>
+    <div class="card-body">
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th class="th-blue">Nombre completo</th>
+                        <th class="th-blue">Correo electrónico</th>
+                        <th class="th-blue">Teléfono</th>
+                        <th class="th-blue">Dirección</th>
+                        <th class="th-blue">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var client in Model.Clients)
+                {
+                    <tr>
+                        <td>@client.LastName @client.FirstName</td>
+                        <td>@client.Email</td>
+                        <td>@client.Phone</td>
+                        <td>@client.Address</td>
+                        <td>
+                            <form method="post" asp-page-handler="Edit" class="d-inline">
+                                <input type="hidden" name="id" value="@client.Id" />
+                                <button class="btn btn-warning btn-sm" type="submit" title="Editar"><i class="fas fa-edit"></i></button>
+                            </form>
+                            <button type="button" class="btn btn-danger btn-sm ms-1" title="Eliminar" data-bs-toggle="modal" data-bs-target="#confirmDeleteClientModal" data-client-id="@client.Id">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (!Model.Clients.Any())
+        {
+            <div class="alert alert-info mb-0">No tienes clientes registrados.</div>
+        }
+    </div>
+</div>
+
+<div class="modal fade" id="confirmDeleteClientModal" tabindex="-1" aria-labelledby="confirmDeleteClientLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Delete">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="confirmDeleteClientLabel">¿Confirmar eliminación?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar este cliente?
+                    <input type="hidden" id="deleteClientId" name="id" />
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const clientModal = document.getElementById('confirmDeleteClientModal');
+    clientModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const clientId = button.getAttribute('data-client-id');
+      document.getElementById('deleteClientId').value = clientId;
+    });
+</script>

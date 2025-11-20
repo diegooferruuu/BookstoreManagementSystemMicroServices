@@ -1,0 +1,91 @@
+@page
+@model LibraryWeb.Pages.Distributors.IndexModel
+@{
+    ViewData["Title"] = "Distribuidores";
+}
+
+<div class="card shadow-custom">
+    <div class="card-header card-header-blue d-flex align-items-center justify-content-between">
+        <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Distribuidores</h5>
+        @if (User.IsInRole("Admin"))
+        {
+            <a asp-page="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Añadir Distribuidor</a>
+        }
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th class="th-blue">Nombre</th>
+                        <th class="th-blue">Correo electrónico</th>
+                        <th class="th-blue">Celular</th>
+                        <th class="th-blue">Dirección</th>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <th class="th-blue text-center">Acciones</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var distributor in Model.Distributors)
+                    {
+                        <tr>
+                            <td>@distributor.Name </td>
+                            <td>@distributor.ContactEmail</td>
+                            <td>@distributor.Phone</td>
+                            <td>@distributor.Address</td>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <td class="text-center table-actions">
+                                    <form method="post" asp-page-handler="Edit" asp-antiforgery="true" class="d-inline">
+                                        <input type="hidden" name="id" value="@distributor.Id" />
+                                        <button type="submit" class="btn btn-warning btn-sm btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
+                                    </form>
+                                    <button type="button" class="btn btn-danger btn-sm btn-icon" title="Eliminar" data-bs-toggle="modal" data-bs-target="#confirmDeleteDistributorModal" data-distributor-id="@distributor.Id">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!Model.Distributors.Any())
+        {
+            <div class="alert alert-info mb-0">No tienes distribuidores registrados.</div>
+        }
+    </div>
+</div>
+
+<div class="modal fade" id="confirmDeleteDistributorModal" tabindex="-1" aria-labelledby="confirmDeleteDistributorLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Delete">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="confirmDeleteDistributorLabel">¿Confirmar eliminación?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar este distribuidor?
+                    <input type="hidden" id="deleteDistributorId" name="id" />
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const distributorModal = document.getElementById('confirmDeleteDistributorModal');
+    distributorModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const distributorId = button.getAttribute('data-distributor-id');
+      document.getElementById('deleteDistributorId').value = distributorId;
+    });
+</script>
