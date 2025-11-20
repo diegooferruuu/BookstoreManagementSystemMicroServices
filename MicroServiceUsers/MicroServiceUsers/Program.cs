@@ -74,6 +74,17 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Seed de la base de datos
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var userRepository = services.GetRequiredService<IUserRepository>();
+    var logger = services.GetRequiredService<ILogger<DatabaseSeeder>>();
+    
+    var seeder = new DatabaseSeeder(userRepository, logger);
+    await seeder.SeedAsync();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
