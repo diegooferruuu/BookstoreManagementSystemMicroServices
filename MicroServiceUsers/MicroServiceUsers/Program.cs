@@ -5,6 +5,7 @@ using MicroServiceUsers.Infrastructure.DataBase;
 using MicroServiceUsers.Infrastructure.Repositories;
 using MicroServiceUsers.Infrastructure.Auth;
 using MicroServiceUsers.Infrastructure.Security;
+using MicroServiceUsers.Infrastructure.Email;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -19,6 +20,11 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 var jwtOptions = new JwtOptions();
 builder.Configuration.GetSection("Jwt").Bind(jwtOptions);
 builder.Services.AddSingleton(jwtOptions);
+
+// Configuración SendGrid
+var sendGridOptions = new SendGridOptions();
+builder.Configuration.GetSection("SendGrid").Bind(sendGridOptions);
+builder.Services.AddSingleton(sendGridOptions);
 
 // Autenticación JWT
 builder.Services.AddAuthentication(options =>
@@ -51,6 +57,12 @@ builder.Services.AddScoped<ITokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IJwtAuthService, JwtAuthService>();
 builder.Services.AddScoped<IPasswordGenerator, SecurePasswordGenerator>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGenerator>();
+builder.Services.AddScoped<IEmailService>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<SendGridEmailService>>();
+    var options = sp.GetRequiredService<SendGridOptions>();
+    return new SendGridEmailService(options, logger);
+});
 
 // Fachada
 builder.Services.AddScoped<IUserFacade, UserFacade>();

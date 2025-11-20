@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using MicroServiceUsers.Application.DTOs;
 using MicroServiceUsers.Domain.Interfaces;
 using MicroServiceUsers.Domain.Models;
@@ -11,17 +12,23 @@ namespace MicroServiceUsers.Application.Facade
         private readonly IJwtAuthService _auth;
         private readonly IPasswordGenerator _pwdGen;
         private readonly IUsernameGenerator _unameGen;
+        private readonly IEmailService _email;
+        private readonly ILogger<UserFacade> _logger;
 
         public UserFacade(
             IUserService users,
             IJwtAuthService auth,
             IPasswordGenerator pwdGen,
-            IUsernameGenerator unameGen)
+            IUsernameGenerator unameGen,
+            IEmailService email,
+            ILogger<UserFacade> logger)
         {
             _users = users;
             _auth = auth;
             _pwdGen = pwdGen;
             _unameGen = unameGen;
+            _email = email;
+            _logger = logger;
         }
 
         public async Task<UserReadDto> CreateUserAsync(UserCreateDto dto, CancellationToken ct = default)
@@ -52,9 +59,35 @@ namespace MicroServiceUsers.Application.Facade
             var roles = new List<string> { dto.Role };
             await _users.CreateAsync(user, plainPassword, roles, ct);
 
-            // TODO: Enviar email con credenciales
-            // var html = $"<p>Usuario: <b>{uniqueUsername}</b></p><p>Contraseña: <b>{plainPassword}</b></p>";
-            // await _email.SendEmailAsync(dto.Email, "Credenciales de acceso", html, ct);
+            _logger.LogInformation("Usuario creado: {Username}, Email: {Email}. Enviando correo con credenciales...", 
+                uniqueUsername, dto.Email);
+
+            // Enviar email con credenciales
+            var html = $@"
+                <html>
+                <body style='font-family: Arial, sans-serif;'>
+                    <h2 style='color: #333;'>Bienvenido a Bookstore Management System</h2>
+                    <p>Se ha creado una cuenta para ti. A continuación tus credenciales de acceso:</p>
+                    <div style='background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;'>
+                        <p><strong>Usuario:</strong> {uniqueUsername}</p>
+                        <p><strong>Contraseña:</strong> {plainPassword}</p>
+                        <p><strong>Rol:</strong> {dto.Role}</p>
+                    </div>
+                    <p style='color: #ff6600;'><strong>Importante:</strong> Por seguridad, te recomendamos cambiar tu contraseña después del primer inicio de sesión.</p>
+                    <p>Saludos,<br>El equipo de Bookstore Management System</p>
+                </body>
+                </html>";
+
+            var emailSent = await _email.SendEmailAsync(dto.Email, "Credenciales de acceso - Bookstore Management System", html, ct);
+            
+            if (emailSent)
+            {
+                _logger.LogInformation("Correo enviado exitosamente a {Email}", dto.Email);
+            }
+            else
+            {
+                _logger.LogWarning("No se pudo enviar el correo a {Email}. El usuario fue creado pero no recibió las credenciales.", dto.Email);
+            }
 
             return new UserReadDto
             {
