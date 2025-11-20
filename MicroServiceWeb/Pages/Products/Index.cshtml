@@ -1,0 +1,93 @@
+@page
+@model LibraryWeb.Pages.Products.IndexModel
+@{
+    ViewData["Title"] = "Productos";
+}
+
+<div class="card shadow-custom">
+    <div class="card-header card-header-blue d-flex align-items-center justify-content-between">
+        <h5 class="mb-0"><i class="fas fa-box me-2"></i>Productos</h5>
+        @if (User.IsInRole("Admin"))
+        {
+            <a asp-page="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Añadir Producto</a>
+        }
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th class="th-blue">Nombre</th>
+                        <th class="th-blue">Descripción</th>
+                        <th class="th-blue">Categoría</th>
+                        <th class="th-blue">Precio</th>
+                        <th class="th-blue">Inventario</th>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <th class="th-blue text-center">Acciones</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var product in Model.Products)
+                    {
+                        <tr>
+                            <td>@product.Name</td>
+                            <td>@product.Description</td>
+                            <td>@product.CategoryName</td>
+                            <td>@product.Price.ToString("C")</td>
+                            <td>@product.Stock</td>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <td class="text-center table-actions">
+                                    <form method="post" asp-page-handler="Edit" asp-antiforgery="true" class="d-inline">
+                                        <input type="hidden" name="id" value="@product.Id" />
+                                        <button type="submit" class="btn btn-warning btn-sm btn-icon"><i class="fas fa-edit"></i> Editar</button>
+                                    </form>
+                                    <button type="button" class="btn btn-danger btn-sm btn-icon" data-bs-toggle="modal" data-bs-target="#confirmDeleteProductModal" data-product-id="@product.Id">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!Model.Products.Any())
+        {
+            <div class="alert alert-info mb-0">No tienes productos registrados.</div>
+        }
+    </div>
+</div>
+
+<div class="modal fade" id="confirmDeleteProductModal" tabindex="-1" aria-labelledby="confirmDeleteProductLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Delete">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="confirmDeleteProductLabel">¿Confirmar eliminación?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar este producto?
+                    <input type="hidden" id="deleteProductId" name="id" />
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const productModal = document.getElementById('confirmDeleteProductModal');
+    productModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const productId = button.getAttribute('data-product-id');
+      document.getElementById('deleteProductId').value = productId;
+    });
+</script>

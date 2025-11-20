@@ -1,0 +1,36 @@
+@page
+@model LibraryWeb.Pages.Clients.CreateModel
+@{
+    ViewData["Title"] = "Crear Cliente";
+}
+<h2>Crear Cliente</h2>
+<form method="post" novalidate>
+    <div class="mb-3">
+        <label asp-for="Client.FirstName" class="form-label"></label>
+        <input asp-for="Client.FirstName" class="form-control" />
+        <span class="text-danger" asp-validation-for="Client.FirstName"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Client.LastName" class="form-label"></label>
+        <input asp-for="Client.LastName" class="form-control" />
+        <span class="text-danger" asp-validation-for="Client.LastName"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Client.Email" class="form-label"></label>
+        <input asp-for="Client.Email" class="form-control" />
+        <span class="text-danger" asp-validation-for="Client.Email"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Client.Phone" class="form-label"></label>
+        <input asp-for="Client.Phone" class="form-control" />
+        <span class="text-danger" asp-validation-for="Client.Phone"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Client.Address" class="form-label"></label>
+        <textarea asp-for="Client.Address" class="form-control"></textarea>
+        <span class="text-danger" asp-validation-for="Client.Address"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Crear</button>
+    <a asp-page="Index" class="btn btn-secondary">Cancelar</a>
+</form>
+@section Scripts { <partial name="Shared/_ValidationScriptsPartial" /> }
