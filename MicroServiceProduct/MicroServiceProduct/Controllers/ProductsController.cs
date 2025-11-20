@@ -4,6 +4,7 @@ using MicroServiceProduct.Application.Services;
 using MicroServiceProduct.Domain.Models;
 using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Http;
 
 namespace MicroServiceProduct.Controllers;
 
@@ -18,23 +19,37 @@ public class ProductsController : ControllerBase
         _svc = svc;
     }
 
+    /// <summary>
+    /// Obtiene todos los productos.
+    /// </summary>
     [HttpGet]
-    public IActionResult GetAll()
+    [ProducesResponseType(typeof(IEnumerable<Product>), StatusCodes.Status200OK)]
+    public ActionResult<IEnumerable<Product>> GetAll()
     {
         var list = _svc.GetAll();
         return Ok(list);
     }
 
+    /// <summary>
+    /// Obtiene un producto por su id.
+    /// </summary>
     [HttpGet("{id}")]
-    public IActionResult Get(Guid id)
+    [ProducesResponseType(typeof(Product), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<Product> Get(Guid id)
     {
         var p = _svc.Read(id);
         if (p == null) return NotFound();
         return Ok(p);
     }
 
+    /// <summary>
+    /// Crea un nuevo producto.
+    /// </summary>
     [HttpPost]
-    public IActionResult Create([FromBody] Product model)
+    [ProducesResponseType(typeof(Product), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult<Product> Create([FromBody] Product? model)
     {
         if (model == null) return BadRequest();
         if (string.IsNullOrWhiteSpace(model.Name)) return BadRequest(new { message = "Name is required" });
@@ -45,8 +60,14 @@ public class ProductsController : ControllerBase
         return CreatedAtAction(nameof(Get), new { id = model.Id }, model);
     }
 
+    /// <summary>
+    /// Actualiza un producto existente.
+    /// </summary>
     [HttpPut("{id}")]
-    public IActionResult Update(Guid id, [FromBody] Product model)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult Update(Guid id, [FromBody] Product? model)
     {
         if (model == null) return BadRequest();
         var existing = _svc.Read(id);
@@ -60,7 +81,12 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Elimina un producto por su id.
+    /// </summary>
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult Delete(Guid id)
     {
         var existing = _svc.Read(id);
@@ -69,4 +95,3 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 }
-

@@ -4,6 +4,7 @@ using MicroServiceProduct.Domain.Interfaces;
 using MicroServiceProduct.Domain.Models;
 using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Http;
 
 namespace MicroServiceProduct.Controllers;
 
@@ -18,23 +19,37 @@ public class CategoriesController : ControllerBase
         _repo = repo;
     }
 
+    /// <summary>
+    /// Obtiene todas las categorías.
+    /// </summary>
     [HttpGet]
-    public IActionResult GetAll()
+    [ProducesResponseType(typeof(IEnumerable<Category>), StatusCodes.Status200OK)]
+    public ActionResult<IEnumerable<Category>> GetAll()
     {
         var list = _repo.GetAll();
         return Ok(list);
     }
 
+    /// <summary>
+    /// Obtiene una categoría por su id.
+    /// </summary>
     [HttpGet("{id}")]
-    public IActionResult Get(Guid id)
+    [ProducesResponseType(typeof(Category), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<Category> Get(Guid id)
     {
         var c = _repo.Read(id);
         if (c == null) return NotFound();
         return Ok(c);
     }
 
+    /// <summary>
+    /// Crea una nueva categoría.
+    /// </summary>
     [HttpPost]
-    public IActionResult Create([FromBody] Category model)
+    [ProducesResponseType(typeof(Category), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult<Category> Create([FromBody] Category? model)
     {
         if (model == null) return BadRequest();
         if (string.IsNullOrWhiteSpace(model.Name)) return BadRequest(new { message = "Name is required" });
@@ -44,8 +59,14 @@ public class CategoriesController : ControllerBase
         return CreatedAtAction(nameof(Get), new { id = model.Id }, model);
     }
 
+    /// <summary>
+    /// Actualiza una categoría existente.
+    /// </summary>
     [HttpPut("{id}")]
-    public IActionResult Update(Guid id, [FromBody] Category model)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult Update(Guid id, [FromBody] Category? model)
     {
         if (model == null) return BadRequest();
         var existing = _repo.Read(id);
@@ -56,7 +77,12 @@ public class CategoriesController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Elimina una categoría por su id.
+    /// </summary>
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult Delete(Guid id)
     {
         var existing = _repo.Read(id);
@@ -65,4 +91,3 @@ public class CategoriesController : ControllerBase
         return NoContent();
     }
 }
-

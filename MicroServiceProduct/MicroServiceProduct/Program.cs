@@ -3,12 +3,25 @@ using MicroServiceProduct.Infraestructure.Repository;
 using MicroServiceProduct.Domain.Services;
 using MicroServiceProduct.Domain.Interfaces;
 using MicroServiceProduct.Application.Services;
+using Microsoft.OpenApi.Models;
+using System.Reflection;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Configure Swagger/Swashbuckle
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "MicroServiceProduct API", Version = "v1" });
+    // Include XML comments (requires GenerateDocumentationFile=true in csproj)
+    var xmlFile = (Assembly.GetExecutingAssembly().GetName().Name ?? "") + ".xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
+});
 
 // Register controllers so attribute-routed controllers are available
 builder.Services.AddControllers();
@@ -23,7 +36,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 // Register infrastructure / domain services
 // Register IDataBase as a singleton using DataBaseConnection which requires an explicit connection string
-builder.Services.AddSingleton<IDataBase>(sp => DataBaseConnection.GetInstance(connectionString));
+builder.Services.AddSingleton<IDataBase>(_ => DataBaseConnection.GetInstance(connectionString));
 
 // Repositories
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
@@ -37,7 +50,12 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "MicroServiceProduct API v1");
+        c.RoutePrefix = string.Empty; // serve Swagger UI at app root (/) in development
+    });
 }
 
 // Map controller routes (attribute routing)
