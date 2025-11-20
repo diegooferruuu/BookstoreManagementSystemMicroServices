@@ -41,17 +41,13 @@ namespace MicroServiceUsers.Application.Facade
 
             var plainPassword = _pwdGen.GenerateSecurePassword();
 
-            var temp = new User();
-            var hasher = new PasswordHasher<User>();
-            var hash = hasher.HashPassword(temp, plainPassword);
-
             var user = new User
             {
                 Email = dto.Email.Trim().ToLowerInvariant(),
                 Username = uniqueUsername,
                 FirstName = string.Empty,
                 LastName = string.Empty,
-                PasswordHash = hash,
+                PasswordHash = string.Empty, // Se establecerá en el repositorio
                 IsActive = true,
                 MustChangePassword = true
             };
@@ -105,8 +101,8 @@ namespace MicroServiceUsers.Application.Facade
             if (!result.IsSuccess || result.Value is null)
                 return null;
 
-            // Convertir el objeto anónimo a AuthTokenDto
-            dynamic data = result.Value;
+            // Convertir AuthTokenData a AuthTokenDto
+            var data = result.Value;
             return new AuthTokenDto
             {
                 AccessToken = data.AccessToken,

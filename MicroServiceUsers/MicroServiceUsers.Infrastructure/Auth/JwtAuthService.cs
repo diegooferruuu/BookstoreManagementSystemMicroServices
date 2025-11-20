@@ -11,7 +11,7 @@ namespace MicroServiceUsers.Infrastructure.Auth
         private readonly IUserRepository _users;
         private readonly ITokenGenerator _tokens;
         private readonly JwtOptions _options;
-        private readonly PasswordHasher<object> _hasher = new();
+        private readonly PasswordHasher<User> _hasher = new();
 
         public JwtAuthService(IUserRepository users, ITokenGenerator tokens, JwtOptions options)
         {
@@ -20,21 +20,23 @@ namespace MicroServiceUsers.Infrastructure.Auth
             _options = options;
         }
 
-        public async Task<Result<object>> SignInAsync(string userOrEmail, string password, CancellationToken ct = default)
+        public async Task<Result<AuthTokenData>> SignInAsync(string userOrEmail, string password, CancellationToken ct = default)
         {
             var user = await _users.GetByUserOrEmailAsync(userOrEmail, ct);
 
             if (user is null || !user.IsActive)
-                return Result<object>.Fail(new ValidationError("Credentials", "Credenciales inválidas."));
+                return Result<AuthTokenData>.Fail(new ValidationError("Credentials", "Credenciales inválidas."));
 
-            var verify = _hasher.VerifyHashedPassword(null!, user.PasswordHash, password ?? string.Empty);
+            var verify = _hasher.VerifyHashedPassword(user, user.PasswordHash, password ?? string.Empty);
+            
             if (verify == PasswordVerificationResult.Failed)
-                return Result<object>.Fail(new ValidationError("Credentials", "Credenciales inválidas."));
+                return Result<AuthTokenData>.Fail(new ValidationError("Credentials", "Credenciales inválidas."));
 
-            if (user.MustChangePassword)
-            {
-                return Result<object>.Fail(new ValidationError("MustChangePassword", "Debe cambiar su contraseña antes de continuar."));
-            }
+            // TODO: Implementar lógica para forzar cambio de contraseña en el frontend
+            // if (user.MustChangePassword)
+            // {
+            //     return Result<AuthTokenData>.Fail(new ValidationError("MustChangePassword", "Debe cambiar su contraseña antes de continuar."));
+            // }
 
             // Obtener roles del usuario desde la base de datos
             var roles = await _users.GetRolesAsync(user.Id, ct);
@@ -44,7 +46,7 @@ namespace MicroServiceUsers.Infrastructure.Auth
             var now = DateTimeOffset.UtcNow;
             var jwt = _tokens.CreateToken(user, roles, now, _options);
 
-            var tokenData = new
+            var tokenData = new AuthTokenData
             {
                 AccessToken = jwt,
                 ExpiresAt = now.AddMinutes(_options.ExpiresMinutes),
@@ -56,7 +58,7 @@ namespace MicroServiceUsers.Infrastructure.Auth
                 MiddleName = user.MiddleName
             };
 
-            return Result<object>.Ok(tokenData);
+            return Result<AuthTokenData>.Ok(tokenData);
         }
     }
 }
