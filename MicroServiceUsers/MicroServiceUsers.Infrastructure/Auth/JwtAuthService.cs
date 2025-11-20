@@ -55,7 +55,8 @@ namespace MicroServiceUsers.Infrastructure.Auth
                 Email = user.Email,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                MiddleName = user.MiddleName
+                MiddleName = user.MiddleName,
+                MustChangePassword = user.MustChangePassword
             };
 
             return Result<AuthTokenData>.Ok(tokenData);

@@ -70,5 +70,37 @@ namespace MicroServiceUsers.Controllers
             var users = await _facade.GetAllAsync();
             return Ok(users);
         }
+
+        /// <summary>
+        /// Cambiar contraseña del usuario autenticado
+        /// </summary>
+        /// <param name="dto">Contraseña actual y nueva contraseña</param>
+        /// <returns>Resultado de la operación</returns>
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // Obtener el ID del usuario autenticado desde el token
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized(new { Message = "No se pudo identificar al usuario." });
+
+            try
+            {
+                var result = await _facade.ChangePasswordAsync(userId, dto.CurrentPassword, dto.NewPassword);
+                
+                if (!result)
+                    return BadRequest(new { Message = "La contraseña actual es incorrecta." });
+
+                return Ok(new { Message = "Contraseña cambiada exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Error al cambiar la contraseña", Error = ex.Message });
+            }
+        }
     }
 }
