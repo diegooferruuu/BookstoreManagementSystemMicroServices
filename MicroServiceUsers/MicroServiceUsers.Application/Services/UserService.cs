@@ -53,5 +53,8 @@ namespace MicroServiceUsers.Application.Services
 
         public Task DeleteAsync(Guid id, CancellationToken ct = default) 
             => _repository.DeleteAsync(id, ct);
+
+        public Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default) 
+            => _repository.ChangePasswordAsync(userId, currentPassword, newPassword, ct);
     }
 }

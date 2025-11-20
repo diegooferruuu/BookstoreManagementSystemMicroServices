@@ -215,5 +215,37 @@ namespace MicroServiceUsers.Infrastructure.Repositories
 
             await cmd.ExecuteNonQueryAsync(ct);
         }
+
+        public async Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default)
+        {
+            // Obtener el usuario
+            var user = await GetByIdAsync(userId, ct);
+            if (user is null || !user.IsActive)
+                return false;
+
+            // Verificar la contraseña actual
+            var hasher = new PasswordHasher<User>();
+            var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword);
+            
+            if (verify == PasswordVerificationResult.Failed)
+                return false;
+
+            // Hashear la nueva contraseña
+            var newPasswordHash = hasher.HashPassword(user, newPassword);
+
+            // Actualizar la contraseña y cambiar MustChangePassword a false
+            var sql = @"UPDATE users 
+                        SET password_hash = @passwordHash, 
+                            must_change_password = FALSE
+                        WHERE id = @id";
+
+            await using var conn = _database.GetConnection();
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", userId);
+            cmd.Parameters.AddWithValue("@passwordHash", newPasswordHash);
+
+            var rowsAffected = await cmd.ExecuteNonQueryAsync(ct);
+            return rowsAffected > 0;
+        }
     }
 }

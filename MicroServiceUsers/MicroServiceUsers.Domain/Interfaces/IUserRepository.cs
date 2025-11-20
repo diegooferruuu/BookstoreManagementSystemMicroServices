@@ -17,5 +17,6 @@ namespace MicroServiceUsers.Domain.Interfaces
         Task CreateAsync(User user, string password, List<string> roles, CancellationToken ct = default);
         Task UpdateAsync(User user, CancellationToken ct = default);
         Task DeleteAsync(Guid id, CancellationToken ct = default);
+        Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default);
     }
 }

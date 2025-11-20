@@ -112,7 +112,8 @@ namespace MicroServiceUsers.Application.Facade
                 Email = data.Email,
                 FirstName = data.FirstName,
                 LastName = data.LastName,
-                MiddleName = data.MiddleName
+                MiddleName = data.MiddleName,
+                MustChangePassword = data.MustChangePassword
             };
         }
 
@@ -134,6 +135,11 @@ namespace MicroServiceUsers.Application.Facade
             }
 
             return result.AsReadOnly();
+        }
+
+        public async Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default)
+        {
+            return await _users.ChangePasswordAsync(userId, currentPassword, newPassword, ct);
         }
     }
 }
