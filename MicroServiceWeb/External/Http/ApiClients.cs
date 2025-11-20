@@ -92,6 +92,7 @@ namespace MicroServiceWeb.External.Http
         private static async Task<AuthLoginResult> ParseAuthResponse(HttpResponseMessage resp, CancellationToken ct)
         {
             var result = new AuthLoginResult();
+            var status = resp.StatusCode;
             if (resp.Content.Headers.ContentType?.MediaType == "application/json")
             {
                 var json = await resp.Content.ReadAsStringAsync(ct);
@@ -101,32 +102,38 @@ namespace MicroServiceWeb.External.Http
                     if (resp.IsSuccessStatusCode && root.ValueKind == JsonValueKind.Object)
                     {
                         result.Success = true;
-                        if (root.TryGetProperty("token", out var token)) result.Token = token.GetString();
+                        // Soportar 'accessToken' (backend actual) y 'token' (fallback)
+                        if (root.TryGetProperty("accessToken", out var accessToken)) result.Token = accessToken.GetString();
+                        else if (root.TryGetProperty("token", out var token)) result.Token = token.GetString();
                         if (root.TryGetProperty("expiresAt", out var exp) && exp.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(exp.GetString(), out var dtoExp)) result.ExpiresAt = dtoExp;
-                        if (root.TryGetProperty("user", out var u) && u.ValueKind == JsonValueKind.String) result.UserName = u.GetString() ?? string.Empty;
-                        if (root.TryGetProperty("userName", out var uname)) result.UserName = uname.GetString() ?? result.UserName;
+                        if (root.TryGetProperty("userName", out var uname)) result.UserName = uname.GetString() ?? string.Empty;
+                        else if (root.TryGetProperty("user", out var u) && u.ValueKind == JsonValueKind.String) result.UserName = u.GetString() ?? string.Empty;
                         if (root.TryGetProperty("email", out var em)) result.Email = em.GetString();
+                        if (root.TryGetProperty("firstName", out var fn) && fn.ValueKind == JsonValueKind.String) result.FirstName = fn.GetString();
+                        if (root.TryGetProperty("middleName", out var mn) && mn.ValueKind == JsonValueKind.String) result.MiddleName = mn.GetString();
+                        if (root.TryGetProperty("lastName", out var ln) && ln.ValueKind == JsonValueKind.String) result.LastName = ln.GetString();
                         if (root.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array)
                             foreach (var r in roles.EnumerateArray()) if (r.ValueKind == JsonValueKind.String) result.Roles.Add(r.GetString()!);
                         if (root.TryGetProperty("mustChangePassword", out var mcp)) result.MustChangePassword = mcp.GetBoolean();
                     }
                     else
                     {
-                        if (root.ValueKind == JsonValueKind.Object)
+                        string? msg = null;
+                        foreach (var name in new[] { "message", "Message", "error", "title" })
                         {
-                            if (root.TryGetProperty("message", out var msgProp) && msgProp.ValueKind == JsonValueKind.String)
-                                result.Error = msgProp.GetString();
-                            else if (root.TryGetProperty("error", out var errProp) && errProp.ValueKind == JsonValueKind.String)
-                                result.Error = errProp.GetString();
-                            else if (root.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
-                                result.Error = titleProp.GetString();
-                            else
-                                result.Error = "Error al iniciar sesión.";
+                            if (root.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.String)
+                            { msg = prop.GetString(); break; }
                         }
-                        else
+                        if (string.IsNullOrWhiteSpace(msg))
                         {
-                            result.Error = "Error al iniciar sesión.";
+                            msg = status switch
+                            {
+                                System.Net.HttpStatusCode.Unauthorized => "Credenciales inválidas o usuario inactivo.",
+                                System.Net.HttpStatusCode.Forbidden => "Acceso denegado.",
+                                _ => "Error al iniciar sesión."
+                            };
                         }
+                        result.Error = msg;
                         result.Success = false;
                     }
                 }
@@ -140,9 +147,9 @@ namespace MicroServiceWeb.External.Http
                 result.Success = resp.IsSuccessStatusCode;
                 if (!result.Success)
                 {
-                    result.Error = resp.StatusCode switch
+                    result.Error = status switch
                     {
-                        System.Net.HttpStatusCode.Unauthorized => "Credenciales inválidas.",
+                        System.Net.HttpStatusCode.Unauthorized => "Credenciales inválidas o usuario inactivo.",
                         System.Net.HttpStatusCode.Forbidden => "Acceso denegado.",
                         _ => "Error en la autenticación."
                     };

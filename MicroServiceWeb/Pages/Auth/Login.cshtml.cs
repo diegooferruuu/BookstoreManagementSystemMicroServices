@@ -15,13 +15,11 @@ namespace LibraryWeb.Pages.Auth
         [BindProperty, Required(ErrorMessage="El usuario o correo es obligatorio."), Display(Name="Usuario o Correo")] public string UserOrEmail { get; set; } = string.Empty;
         [BindProperty, Required(ErrorMessage="La contraseña es obligatoria."), Display(Name="Contraseña")] public string Password { get; set; } = string.Empty;
         [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
+        public string? InfoMessage { get; set; }
         public string? ErrorMessage { get; set; }
         public void OnGet()
         {
-            if (TempData.ContainsKey("PasswordChanged"))
-            {
-                ErrorMessage = TempData["PasswordChanged"]?.ToString();
-            }
+            if (TempData.ContainsKey("PasswordChanged")) InfoMessage = TempData["PasswordChanged"]?.ToString();
             Password = string.Empty;
         }
         public async Task<IActionResult> OnPostAsync()
@@ -29,22 +27,24 @@ namespace LibraryWeb.Pages.Auth
             UserOrEmail = (UserOrEmail ?? string.Empty).Trim(); Password = (Password ?? string.Empty).Trim();
             if (!ModelState.IsValid) return Page();
             if (!string.IsNullOrEmpty(ReturnUrl) && !Url.IsLocalUrl(ReturnUrl)) ReturnUrl = Url.Page("/Index");
+
             var loginResult = await _usersApi.LoginAsync(new AuthLoginRequest { UserOrEmail = UserOrEmail, Password = Password }, HttpContext.RequestAborted);
             if (!loginResult.Success)
             {
-                var msg = loginResult.Error;
-                if (string.IsNullOrWhiteSpace(msg) || msg!.Trim().StartsWith("{")) msg = "Credenciales inválidas.";
-                ErrorMessage = msg;
+                ErrorMessage = loginResult.Error ?? "Credenciales inválidas.";
                 return Page();
             }
+
+            // Guardar token para cambio de contraseña si es requerido
+            if (!string.IsNullOrEmpty(loginResult.Token)) TempData["PendingToken"] = loginResult.Token;
             if (loginResult.MustChangePassword)
             {
                 TempData["PendingUser"] = loginResult.UserName;
                 TempData["PendingEmail"] = loginResult.Email;
-                TempData["PendingToken"] = loginResult.Token;
                 TempData["FirstLogin"] = true;
                 return RedirectToPage("/Users/ChangePassword", new { first = true });
             }
+
             var claims = new List<Claim>
             {
                 new(ClaimTypes.Name, loginResult.UserName),
