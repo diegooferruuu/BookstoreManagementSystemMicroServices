@@ -22,7 +22,7 @@
                         <th class="th-blue">Correo electrónico</th>
                         <th class="th-blue">Teléfono</th>
                         <th class="th-blue">Dirección</th>
-                        <th class="th-blue text-center">Acciones</th>
+                        <th class="th-blue">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -33,15 +33,14 @@
                         <td>@client.Email</td>
                         <td>@client.Phone</td>
                         <td>@client.Address</td>
-                        <td class="text-center">
+                        <td>
                             <form method="post" asp-page-handler="Edit" class="d-inline">
                                 <input type="hidden" name="id" value="@client.Id" />
-                                <button class="btn btn-warning btn-sm" type="submit"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-warning btn-sm" type="submit" title="Editar"><i class="fas fa-edit"></i></button>
                             </form>
-                            <form method="post" asp-page-handler="Delete" class="d-inline ms-1">
-                                <input type="hidden" name="id" value="@client.Id" />
-                                <button class="btn btn-danger btn-sm" type="submit"><i class="fas fa-trash"></i></button>
-                            </form>
+                            <button type="button" class="btn btn-danger btn-sm ms-1" title="Eliminar" data-bs-toggle="modal" data-bs-target="#confirmDeleteClientModal" data-client-id="@client.Id">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </td>
                     </tr>
                 }
@@ -54,3 +53,33 @@
         }
     </div>
 </div>
+
+<div class="modal fade" id="confirmDeleteClientModal" tabindex="-1" aria-labelledby="confirmDeleteClientLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Delete">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="confirmDeleteClientLabel">¿Confirmar eliminación?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar este cliente?
+                    <input type="hidden" id="deleteClientId" name="id" />
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const clientModal = document.getElementById('confirmDeleteClientModal');
+    clientModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const clientId = button.getAttribute('data-client-id');
+      document.getElementById('deleteClientId').value = clientId;
+    });
+</script>

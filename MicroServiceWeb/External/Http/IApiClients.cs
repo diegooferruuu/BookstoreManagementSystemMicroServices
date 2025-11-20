@@ -5,7 +5,17 @@ using System;
 
 namespace MicroServiceWeb.External.Http;
 
-public interface IProductsApiClient { }
+public interface IProductsApiClient
+{
+    // Productos
+    Task<IReadOnlyList<ProductDto>> GetAllAsync(CancellationToken ct);
+    Task<ProductDto?> GetByIdAsync(Guid id, CancellationToken ct);
+    Task<ProductApiResult> CreateAsync(ProductCreateDto dto, CancellationToken ct);
+    Task<ProductApiResult> UpdateAsync(Guid id, ProductUpdateDto dto, CancellationToken ct);
+    Task<bool> DeleteAsync(Guid id, CancellationToken ct);
+    // Categorías (del mismo microservicio)
+    Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken ct);
+}
 public interface ISalesApiClient { }
 public interface IUsersApiClient
 {
@@ -19,6 +29,8 @@ public interface IUsersApiClient
     Task<UserApiResult> RegisterAsync(UserCreateRequest dto, CancellationToken ct); // nuevo /api/Auth/register
     Task<UserApiResult> UpdateAsync(Guid id, UserUpdateRequest dto, CancellationToken ct);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct);
+    Task<ApiSimpleResult> ChangePasswordAsync(ChangePasswordRequest dto, CancellationToken ct);
+    Task<ApiSimpleResult> ChangePasswordAsync(ChangePasswordRequest dto, string? bearerToken, CancellationToken ct);
 }
 public interface IClientsApiClient
 {
@@ -42,6 +54,37 @@ public record UserFullDto(Guid Id, string Username, string? Email, string? First
 public record ClientDto(Guid Id, string FirstName, string LastName, string? Email, string? Phone, string? Address);
 public record DistributorDto(Guid Id, string Name, string? ContactEmail, string? Phone, string? Address);
 
+// ===== Productos / Categorías DTOs =====
+public record CategoryDto(Guid Id, string Name);
+public record ProductDto(Guid Id, string Name, string? Description, Guid CategoryId, string? CategoryName, decimal Price, int Stock);
+
+public class ProductCreateDto
+{
+    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), Display(Name = "Nombre")]
+    public string Name { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "La descripción es obligatoria."), MaxLength(500, ErrorMessage = "Máximo 500 caracteres."), Display(Name = "Descripción")]
+    public string? Description { get; set; }
+
+    [Required(ErrorMessage = "La categoría es obligatoria."), Display(Name = "Categoría")]
+    public Guid? CategoryId { get; set; }
+
+    [Range(0.01, 999999.99, ErrorMessage = "El precio debe ser mayor a 0."), Display(Name = "Precio")]
+    public decimal Price { get; set; }
+
+    [Range(0, int.MaxValue, ErrorMessage = "El stock no puede ser negativo."), Display(Name = "Stock")]
+    public int Stock { get; set; }
+}
+
+public class ProductUpdateDto : ProductCreateDto { }
+
+public class ProductApiResult
+{
+    public bool Success { get; set; }
+    public ProductDto? Product { get; set; }
+    public Dictionary<string, List<string>> Errors { get; set; } = new();
+}
+
 public class AuthLoginRequest { [Required] public string UserOrEmail { get; set; } = string.Empty; [Required] public string Password { get; set; } = string.Empty; }
 public class AuthLoginResult
 {
@@ -56,6 +99,22 @@ public class AuthLoginResult
     public string? LastName { get; set; }
     public bool MustChangePassword { get; set; }
     public List<string> Roles { get; set; } = new();
+}
+
+public class ChangePasswordRequest
+{
+    [Required(ErrorMessage = "La contraseña actual es obligatoria.")]
+    public string CurrentPassword { get; set; } = string.Empty;
+    [Required(ErrorMessage = "La nueva contraseña es obligatoria."), MinLength(8)]
+    public string NewPassword { get; set; } = string.Empty;
+    [Required, Compare(nameof(NewPassword), ErrorMessage = "Las contraseñas no coinciden.")]
+    public string ConfirmPassword { get; set; } = string.Empty;
+}
+
+public class ApiSimpleResult
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
 }
 
 public class UserCreateRequest

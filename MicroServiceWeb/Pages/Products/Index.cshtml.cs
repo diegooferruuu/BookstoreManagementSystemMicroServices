@@ -1,24 +1,25 @@
-using ServiceProducts.Domain.Models;
-using ServiceProducts.Domain.Interfaces;
+using MicroServiceWeb.External.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Linq;
+using System.Threading;
 
 namespace LibraryWeb.Pages.Products
 {
     public class IndexModel : PageModel
     {
-        private readonly IProductService _service;
+        private readonly IProductsApiClient _api;
 
-        public List<Product> Products { get; set; } = new();
+        public List<ProductDto> Products { get; set; } = new();
 
-        public IndexModel(IProductService service)
+        public IndexModel(IProductsApiClient api)
         {
-            _service = service;
+            _api = api;
         }
 
-        public void OnGet()
+        public async Task OnGetAsync(CancellationToken ct)
         {
-            Products = _service.GetAll();
+            Products = (await _api.GetAllAsync(ct)).ToList();
         }
 
         public IActionResult OnPostEdit(Guid id)
@@ -27,9 +28,10 @@ namespace LibraryWeb.Pages.Products
             return RedirectToPage("Edit");
         }
 
-        public IActionResult OnPostDelete(Guid id)
+        public async Task<IActionResult> OnPostDeleteAsync(Guid id, CancellationToken ct)
         {
-            _service.Delete(id);
+            var ok = await _api.DeleteAsync(id, ct);
+            if (!ok) TempData["ErrorMessage"] = "No se pudo eliminar";
             return RedirectToPage();
         }
     }

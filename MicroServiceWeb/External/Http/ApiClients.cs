@@ -5,10 +5,55 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Net.Http.Headers;
 
 namespace MicroServiceWeb.External.Http
 {
-    public class ProductsApiClient : IProductsApiClient { private readonly HttpClient _http; public ProductsApiClient(IHttpClientFactory f)=>_http=f.CreateClient("ProductsService"); }
+    public class ProductsApiClient : IProductsApiClient
+    {
+        private readonly HttpClient _http;
+        public ProductsApiClient(IHttpClientFactory f)=>_http=f.CreateClient("ProductsService");
+        public async Task<IReadOnlyList<ProductDto>> GetAllAsync(CancellationToken ct)
+            => await _http.GetFromJsonAsync<IReadOnlyList<ProductDto>>("api/products", ct) ?? Array.Empty<ProductDto>();
+        public async Task<ProductDto?> GetByIdAsync(Guid id, CancellationToken ct)
+            => await _http.GetFromJsonAsync<ProductDto>($"api/products/{id}", ct);
+        public async Task<ProductApiResult> CreateAsync(ProductCreateDto dto, CancellationToken ct)
+        { var resp = await _http.PostAsJsonAsync("api/products", dto, ct); return await ParseProductResult(resp, ct); }
+        public async Task<ProductApiResult> UpdateAsync(Guid id, ProductUpdateDto dto, CancellationToken ct)
+        { var resp = await _http.PutAsJsonAsync($"api/products/{id}", dto, ct); return await ParseProductResult(resp, ct); }
+        public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
+        { var resp = await _http.DeleteAsync($"api/products/{id}", ct); return resp.IsSuccessStatusCode; }
+        public async Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken ct)
+            => await _http.GetFromJsonAsync<IReadOnlyList<CategoryDto>>("api/categories", ct) ?? Array.Empty<CategoryDto>();
+        private static async Task<ProductApiResult> ParseProductResult(HttpResponseMessage resp, CancellationToken ct)
+        {
+            var result = new ProductApiResult { Success = resp.IsSuccessStatusCode };
+            if (resp.Content.Headers.ContentType?.MediaType == "application/json")
+            {
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                try
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+                    if (resp.IsSuccessStatusCode && root.ValueKind == JsonValueKind.Object)
+                    { result.Product = System.Text.Json.JsonSerializer.Deserialize<ProductDto>(root.GetRawText()); }
+                    else if (root.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var prop in root.EnumerateObject())
+                        {
+                            if (prop.Value.ValueKind == JsonValueKind.Array)
+                            { var list = new List<string>(); foreach (var item in prop.Value.EnumerateArray()) list.Add(item.GetString() ?? "Error"); result.Errors[prop.Name] = list; }
+                            else if (prop.Value.ValueKind == JsonValueKind.String)
+                            { result.Errors[prop.Name] = new List<string> { prop.Value.GetString() ?? "Error" }; }
+                        }
+                    }
+                }
+                catch { }
+            }
+            return result;
+        }
+    }
+
     public class SalesApiClient : ISalesApiClient { private readonly HttpClient _http; public SalesApiClient(IHttpClientFactory f)=>_http=f.CreateClient("SalesService"); }
 
     public class UsersApiClient : IUsersApiClient
@@ -25,6 +70,25 @@ namespace MicroServiceWeb.External.Http
         public async Task<UserApiResult> RegisterAsync(UserCreateRequest dto, CancellationToken ct) { var resp = await _http.PostAsJsonAsync("api/Auth/register", dto, ct); return await ParseUserResult(resp, ct); }
         public async Task<UserApiResult> UpdateAsync(Guid id, UserUpdateRequest dto, CancellationToken ct) { var resp = await _http.PutAsJsonAsync($"api/User/{id}", dto, ct); return await ParseUserResult(resp, ct); }
         public async Task<bool> DeleteAsync(Guid id, CancellationToken ct) { var resp = await _http.DeleteAsync($"api/User/{id}", ct); return resp.IsSuccessStatusCode; }
+        public async Task<ApiSimpleResult> ChangePasswordAsync(ChangePasswordRequest dto, CancellationToken ct)
+        { return await ChangePasswordAsync(dto, null, ct); }
+        public async Task<ApiSimpleResult> ChangePasswordAsync(ChangePasswordRequest dto, string? bearerToken, CancellationToken ct)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, "api/Auth/change-password") { Content = JsonContent.Create(dto) };
+            if (!string.IsNullOrWhiteSpace(bearerToken)) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return new ApiSimpleResult { Success = true };
+            var text = await resp.Content.ReadAsStringAsync(ct);
+            try
+            {
+                using var doc = JsonDocument.Parse(text);
+                var root = doc.RootElement;
+                var msg = root.TryGetProperty("message", out var m) ? m.GetString() : "Error al cambiar contraseña.";
+                return new ApiSimpleResult { Success = false, Error = msg };
+            }
+            catch { return new ApiSimpleResult { Success = false, Error = "Error al cambiar contraseña." }; }
+        }
+
         private static async Task<AuthLoginResult> ParseAuthResponse(HttpResponseMessage resp, CancellationToken ct)
         {
             var result = new AuthLoginResult();
@@ -44,10 +108,10 @@ namespace MicroServiceWeb.External.Http
                         if (root.TryGetProperty("email", out var em)) result.Email = em.GetString();
                         if (root.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array)
                             foreach (var r in roles.EnumerateArray()) if (r.ValueKind == JsonValueKind.String) result.Roles.Add(r.GetString()!);
+                        if (root.TryGetProperty("mustChangePassword", out var mcp)) result.MustChangePassword = mcp.GetBoolean();
                     }
                     else
                     {
-                        // Extraer mensaje amigable
                         if (root.ValueKind == JsonValueKind.Object)
                         {
                             if (root.TryGetProperty("message", out var msgProp) && msgProp.ValueKind == JsonValueKind.String)
@@ -57,7 +121,7 @@ namespace MicroServiceWeb.External.Http
                             else if (root.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
                                 result.Error = titleProp.GetString();
                             else
-                                result.Error = "Error al iniciar sesión."; // fallback
+                                result.Error = "Error al iniciar sesión.";
                         }
                         else
                         {
@@ -97,7 +161,6 @@ namespace MicroServiceWeb.External.Http
                     using var doc = JsonDocument.Parse(json); var root = doc.RootElement;
                     if (resp.IsSuccessStatusCode && root.ValueKind == JsonValueKind.Object)
                     {
-                        // map minimal fields
                         var id = root.TryGetProperty("id", out var idProp) && Guid.TryParse(idProp.GetString(), out var gid) ? gid : Guid.Empty;
                         var username = root.TryGetProperty("username", out var unProp) ? unProp.GetString() : null;
                         var email = root.TryGetProperty("email", out var emProp) ? emProp.GetString() : null;
@@ -170,20 +233,11 @@ namespace MicroServiceWeb.External.Http
         public async Task<DistributorDto?> GetByIdAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<DistributorDto>($"api/Distributors/{id}", ct);
         public async Task<IReadOnlyList<DistributorDto>> GetAllAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<DistributorDto>>("api/Distributors", ct) ?? Array.Empty<DistributorDto>();
         public async Task<DistributorApiResult> CreateAsync(DistributorCreateDto dto, CancellationToken ct)
-        {
-            var resp = await _http.PostAsJsonAsync("api/Distributors", dto, ct);
-            return await ParseResult(resp, ct);
-        }
+        { var resp = await _http.PostAsJsonAsync("api/Distributors", dto, ct); return await ParseResult(resp, ct); }
         public async Task<DistributorApiResult> UpdateAsync(Guid id, DistributorUpdateDto dto, CancellationToken ct)
-        {
-            var resp = await _http.PutAsJsonAsync($"api/Distributors/{id}", dto, ct);
-            return await ParseResult(resp, ct);
-        }
+        { var resp = await _http.PutAsJsonAsync($"api/Distributors/{id}", dto, ct); return await ParseResult(resp, ct); }
         public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
-        {
-            var resp = await _http.DeleteAsync($"api/Distributors/{id}", ct);
-            return resp.IsSuccessStatusCode;
-        }
+        { var resp = await _http.DeleteAsync($"api/Distributors/{id}", ct); return resp.IsSuccessStatusCode; }
         private static async Task<DistributorApiResult> ParseResult(HttpResponseMessage resp, CancellationToken ct)
         {
             var result = new DistributorApiResult { Success = resp.IsSuccessStatusCode };
@@ -195,23 +249,15 @@ namespace MicroServiceWeb.External.Http
                     using var doc = JsonDocument.Parse(json);
                     var root = doc.RootElement;
                     if (resp.IsSuccessStatusCode && root.ValueKind == JsonValueKind.Object)
-                    {
-                        result.Distributor = System.Text.Json.JsonSerializer.Deserialize<DistributorDto>(root.GetRawText());
-                    }
+                    { result.Distributor = System.Text.Json.JsonSerializer.Deserialize<DistributorDto>(root.GetRawText()); }
                     else if (root.ValueKind == JsonValueKind.Object)
                     {
                         foreach (var prop in root.EnumerateObject())
                         {
                             if (prop.Value.ValueKind == JsonValueKind.Array)
-                            {
-                                var list = new List<string>();
-                                foreach (var item in prop.Value.EnumerateArray()) list.Add(item.GetString() ?? "Error");
-                                result.Errors[prop.Name] = list;
-                            }
+                            { var list = new List<string>(); foreach (var item in prop.Value.EnumerateArray()) list.Add(item.GetString() ?? "Error"); result.Errors[prop.Name] = list; }
                             else if (prop.Value.ValueKind == JsonValueKind.String)
-                            {
-                                result.Errors[prop.Name] = new List<string> { prop.Value.GetString() ?? "Error" };
-                            }
+                            { result.Errors[prop.Name] = new List<string> { prop.Value.GetString() ?? "Error" }; }
                         }
                     }
                 }

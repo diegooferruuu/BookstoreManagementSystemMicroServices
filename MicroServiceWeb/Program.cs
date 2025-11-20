@@ -18,8 +18,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<AuthHeaderHandler>();
 
+// Cultura es-BO para moneda Bs.
+var cultureInfo = new CultureInfo("es-BO");
+CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
+builder.Services.Configure<RequestLocalizationOptions>(options => { options.DefaultRequestCulture = new RequestCulture(cultureInfo); });
+
 // === Registro de HttpClients para microservicios ===
-builder.Services.AddHttpClient("ProductsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Products"] ?? "https://placeholder-products"));
+builder.Services.AddHttpClient("ProductsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Products"] ?? "https://localhost:57307/"));
 builder.Services.AddHttpClient("SalesService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Sales"] ?? "https://placeholder-sales"));
 builder.Services.AddHttpClient("UsersService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Users"] ?? "https://placeholder-users"))
                 .AddHttpMessageHandler<AuthHeaderHandler>();
@@ -32,18 +38,34 @@ builder.Services.AddTransient<IUsersApiClient, UsersApiClient>();
 builder.Services.AddTransient<IClientsApiClient, ClientsApiClient>();
 builder.Services.AddTransient<IDistributorsApiClient, DistributorsApiClient>();
 
+// Stubs solo para otros dominios (usuarios, ventas, etc.)
 builder.Services.AddSingleton<IUserService, StubUserService>();
 builder.Services.AddSingleton<IJwtAuthService, StubJwtAuthService>();
 builder.Services.AddSingleton<IUserFacade, StubUserFacade>();
 
-builder.Services.AddSingleton<IProductRepository, StubProductRepository>();
-builder.Services.AddSingleton<IProductService, StubProductService>();
-builder.Services.AddSingleton<ICategoryRepository, StubCategoryRepository>();
-builder.Services.AddSingleton<IProductReportService, StubProductReportService>();
-
+// Mantener otros stubs necesarios para el sitio (clientes, distribuidores, ventas)
 builder.Services.AddSingleton<IClientService, StubClientService>();
 builder.Services.AddSingleton<IDistributorService, StubDistributorService>();
 builder.Services.AddSingleton<ISalesReportService, StubSalesReportService>();
+
+// Autenticación Cookie y políticas de autorización
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Auth/Login";
+        options.AccessDeniedPath = "/Auth/Login";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
+    options.AddPolicy("EmployeeOnly", p => p.RequireRole("Employee"));
+    options.AddPolicy("AdminOrEmployee", p => p.RequireRole("Admin", "Employee"));
+    options.AddPolicy("RequireEmployeeOrAdmin", p => p.RequireRole("Admin", "Employee"));
+});
 
 builder.Services.AddRazorPages(options =>
 {
@@ -72,31 +94,6 @@ builder.Services.AddRazorPages(options =>
     options.ModelBindingMessageProvider.SetMissingBindRequiredValueAccessor(x => $"Falta el valor para {x}.");
 });
 
-var cultureInfo = new CultureInfo("es-ES");
-CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
-CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
-builder.Services.Configure<RequestLocalizationOptions>(options => { options.DefaultRequestCulture = new RequestCulture(cultureInfo); });
-
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/Auth/Login";
-        options.AccessDeniedPath = "/Auth/Login";
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-    });
-
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
-    options.AddPolicy("EmployeeOnly", p => p.RequireRole("Employee"));
-    options.AddPolicy("AdminOrEmployee", p => p.RequireRole("Admin", "Employee"));
-    options.AddPolicy("RequireEmployeeOrAdmin", p => p.RequireRole("Admin", "Employee"));
-});
-
-builder.Services.AddControllersWithViews().AddDataAnnotationsLocalization();
-
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -105,10 +102,20 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseRequestLocalization();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    // Forzar cambio de contraseña: si hay flag en TempData se maneja en página; si ya autenticado con claim MustChange (no usamos claim), bloqueamos rutas protegidas
+    if (context.User?.Identity?.IsAuthenticated == true)
+    {
+        // Nada adicional, el flujo de primera vez se maneja antes de crear cookie.
+    }
+    await next();
+});
 app.UseAuthorization();
 app.MapRazorPages();
 app.Run();
@@ -120,8 +127,9 @@ public class StubUserService : IUserService
     private readonly List<ServiceUsers.Domain.Models.User> _users = new();
     public StubUserService()
     {
-        _users.Add(new ServiceUsers.Domain.Models.User { Username = "admin", Email = "admin@test.local", Roles = new List<string>{"Admin"}, PasswordHash = "admin" });
-        _users.Add(new ServiceUsers.Domain.Models.User { Username = "empleado", Email = "empleado@test.local", Roles = new List<string>{"Employee"}, PasswordHash = "empleado" });
+        // Predefinido: deben cambiar contraseña en primer login
+        _users.Add(new ServiceUsers.Domain.Models.User { Username = "admin", Email = "admin@test.local", Roles = new List<string>{"Admin"}, PasswordHash = "admin", MustChangePassword = true });
+        _users.Add(new ServiceUsers.Domain.Models.User { Username = "empleado", Email = "empleado@test.local", Roles = new List<string>{"Employee"}, PasswordHash = "empleado", MustChangePassword = true });
     }
     public IEnumerable<ServiceUsers.Domain.Models.User> GetAll() => _users;
     public ServiceUsers.Domain.Models.User? Read(Guid id) => _users.FirstOrDefault(u => u.Id == id);
@@ -156,7 +164,8 @@ public class StubJwtAuthService : IJwtAuthService
             MiddleName = usr.MiddleName,
             LastName = usr.LastName,
             Roles = usr.Roles,
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(8)
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(8),
+            MustChangePassword = usr.MustChangePassword
         };
         if (usr.MustChangePassword)
             result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "MustChangePassword", Message = "Debe cambiar contraseña" });
@@ -169,98 +178,11 @@ public class StubUserFacade : IUserFacade
     private readonly IUserService _userService;
     public StubUserFacade(IUserService userService) { _userService = userService; }
     public Task CreateUserAsync(ServiceUsers.Application.DTOs.UserCreateDto dto, CancellationToken ct)
-    {
-        // No-op stub
-        return Task.CompletedTask;
-    }
+    { return Task.CompletedTask; }
     public Task<ServiceUsers.Application.DTOs.AuthResponseDto?> LoginAsync(ServiceUsers.Application.DTOs.AuthRequestDto dto, CancellationToken ct)
-    {
-        // Reusar stub auth service directamente no implementado aquí.
-        return Task.FromResult<ServiceUsers.Application.DTOs.AuthResponseDto?>(null);
-    }
+    { return Task.FromResult<ServiceUsers.Application.DTOs.AuthResponseDto?>(null); }
 }
 
-// Productos
-public interface IProductService
-{
-    List<ServiceProducts.Domain.Models.Product> GetAll();
-    void Create(ServiceProducts.Domain.Models.Product p);
-    void Delete(Guid id);
-    ServiceProducts.Domain.Models.Product? Read(Guid id);
-    void Update(ServiceProducts.Domain.Models.Product p);
-}
-
-public class StubProductRepository : IProductRepository
-{
-    private readonly List<ServiceProducts.Domain.Models.Product> _data = new();
-    public IEnumerable<ServiceProducts.Domain.Models.Product> GetAll() => _data;
-    public List<ServiceProducts.Domain.Models.Product> Internal => _data;
-}
-
-public class StubCategoryRepository : ICategoryRepository
-{
-    private readonly List<Category> _categories = new(){ new Category{ Id = Guid.NewGuid(), Name = "General" } };
-    public IEnumerable<Category> GetAll() => _categories;
-}
-
-public class StubProductService : IProductService
-{
-    private readonly IProductRepository _repo; // usa la interfaz
-    public StubProductService(IProductRepository repo) { _repo = repo; }
-    public List<ServiceProducts.Domain.Models.Product> GetAll() => _repo.GetAll().ToList();
-    public ServiceProducts.Domain.Models.Product? Read(Guid id) => _repo.GetAll().FirstOrDefault(p => p.Id == id);
-    public void Create(ServiceProducts.Domain.Models.Product p)
-    {
-        if (_repo is StubProductRepository concrete)
-        {
-            p.Id = Guid.NewGuid();
-            concrete.Internal.Add(p);
-        }
-    }
-    public void Update(ServiceProducts.Domain.Models.Product p)
-    {
-        if (_repo is StubProductRepository concrete)
-        {
-            var idx = concrete.Internal.FindIndex(x => x.Id == p.Id);
-            if (idx >= 0) concrete.Internal[idx] = p;
-        }
-    }
-    public void Delete(Guid id)
-    {
-        if (_repo is StubProductRepository concrete)
-        {
-            concrete.Internal.RemoveAll(p => p.Id == id);
-        }
-    }
-}
-
-public class StubProductReportService : IProductReportService
-{
-    public Task<ServiceProducts.Application.DTOs.GeneratedReportDto?> GenerateAsync(ServiceProducts.Application.DTOs.ReportFilterDto filter, string format, string generatedBy, byte[]? logo, CancellationToken ct)
-    {
-        var bytes = System.Text.Encoding.UTF8.GetBytes($"Reporte generado por {generatedBy} con formato {format}");
-        return Task.FromResult<ServiceProducts.Application.DTOs.GeneratedReportDto?>(new ServiceProducts.Application.DTOs.GeneratedReportDto
-        {
-            FileName = $"reporte_productos.{(format == "excel" ? "xlsx" : format)}",
-            MimeType = format == "excel" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/pdf",
-            Content = bytes
-        });
-    }
-}
-
-// Categorías y validación
-public class Category { public Guid Id { get; set; } = Guid.NewGuid(); public string Name { get; set; } = string.Empty; }
-public interface ICategoryRepository { IEnumerable<Category> GetAll(); }
-public static class ProductValidation
-{
-    public static IEnumerable<ServiceCommon.Application.Services.ValidationError> Validate(ServiceProducts.Domain.Models.Product p, ICategoryRepository categoryRepository)
-    {
-        if (string.IsNullOrWhiteSpace(p.Name)) yield return new ServiceCommon.Application.Services.ValidationError { Field = nameof(p.Name), Message = "Nombre requerido" }; ;
-        if (p.Price < 0) yield return new ServiceCommon.Application.Services.ValidationError { Field = nameof(p.Price), Message = "Precio inválido" }; ;
-    }
-}
-
-// Clientes
 public class StubClientService : IClientService
 {
     private readonly List<ServiceClients.Domain.Models.Client> _clients = new();
@@ -271,7 +193,6 @@ public class StubClientService : IClientService
     public void Delete(Guid id) { _clients.RemoveAll(c => c.Id == id); }
 }
 
-// Distribuidores
 public class StubDistributorService : IDistributorService
 {
     private readonly List<ServiceDistributors.Domain.Models.Distributor> _dists = new();
@@ -282,7 +203,6 @@ public class StubDistributorService : IDistributorService
     public void Delete(Guid id) { _dists.RemoveAll(d => d.Id == id); }
 }
 
-// Ventas
 public class StubSalesReportService : ISalesReportService
 {
     public Task<byte[]> GenerateSalesReportAsync(ServiceSales.Domain.Models.SaleReportFilter filter, string reportType, string generatedBy)
@@ -294,7 +214,6 @@ public class StubSalesReportService : ISalesReportService
     public Task<string> GetReportFileExtension(string reportType) => Task.FromResult(reportType == "excel" ? ".xlsx" : ".pdf");
 }
 
-// Handler para adjuntar token JWT si existe
 public class AuthHeaderHandler : DelegatingHandler
 {
     private readonly IHttpContextAccessor _accessor;

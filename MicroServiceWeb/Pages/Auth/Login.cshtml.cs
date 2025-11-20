@@ -16,7 +16,14 @@ namespace LibraryWeb.Pages.Auth
         [BindProperty, Required(ErrorMessage="La contraseña es obligatoria."), Display(Name="Contraseña")] public string Password { get; set; } = string.Empty;
         [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
         public string? ErrorMessage { get; set; }
-        public void OnGet() { Password = string.Empty; }
+        public void OnGet()
+        {
+            if (TempData.ContainsKey("PasswordChanged"))
+            {
+                ErrorMessage = TempData["PasswordChanged"]?.ToString();
+            }
+            Password = string.Empty;
+        }
         public async Task<IActionResult> OnPostAsync()
         {
             UserOrEmail = (UserOrEmail ?? string.Empty).Trim(); Password = (Password ?? string.Empty).Trim();
@@ -36,7 +43,7 @@ namespace LibraryWeb.Pages.Auth
                 TempData["PendingEmail"] = loginResult.Email;
                 TempData["PendingToken"] = loginResult.Token;
                 TempData["FirstLogin"] = true;
-                return RedirectToPage("/Users/ChangePassword");
+                return RedirectToPage("/Users/ChangePassword", new { first = true });
             }
             var claims = new List<Claim>
             {

@@ -60,6 +60,7 @@ namespace ServiceUsers.Application.DTOs
         public string? LastName { get; set; }
         public List<string> Roles { get; set; } = new();
         public DateTimeOffset ExpiresAt { get; set; } = DateTimeOffset.UtcNow.AddHours(1);
+        public bool MustChangePassword { get; set; } // agregado para flujo de primer inicio
     }
 
     public class UserCreateDto
