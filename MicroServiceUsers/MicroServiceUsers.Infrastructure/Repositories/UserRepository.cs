@@ -92,8 +92,8 @@ namespace MicroServiceUsers.Infrastructure.Repositories
 
             cmd.Parameters.AddWithValue("@username", user.Username);
             cmd.Parameters.AddWithValue("@email", user.Email);
-            cmd.Parameters.AddWithValue("@first_name", user.FirstName);
-            cmd.Parameters.AddWithValue("@last_name", user.LastName);
+            cmd.Parameters.AddWithValue("@first_name", user.FirstName ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@last_name", user.LastName ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@middle_name", user.MiddleName ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@password_hash", user.PasswordHash);
             cmd.Parameters.AddWithValue("@is_active", user.IsActive);
