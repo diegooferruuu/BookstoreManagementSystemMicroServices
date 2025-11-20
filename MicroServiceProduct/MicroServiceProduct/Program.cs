@@ -3,7 +3,6 @@ using MicroServiceProduct.Infraestructure.Repository;
 using MicroServiceProduct.Domain.Services;
 using MicroServiceProduct.Domain.Interfaces;
 using MicroServiceProduct.Application.Services;
-using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.IO;
 
@@ -13,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Configure Swagger/Swashbuckle
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "MicroServiceProduct API", Version = "v1" });
+    c.SwaggerDoc("v1", new() { Title = "MicroServiceProduct API", Version = "v1" });
     // Include XML comments (requires GenerateDocumentationFile=true in csproj)
     var xmlFile = (Assembly.GetExecutingAssembly().GetName().Name ?? "") + ".xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);

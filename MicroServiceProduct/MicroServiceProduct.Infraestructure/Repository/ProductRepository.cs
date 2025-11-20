@@ -47,7 +47,7 @@ namespace MicroServiceProduct.Infraestructure.Repository
                 {
                     Id = reader.GetGuid(reader.GetOrdinal("id")),
                     Name = reader.GetString(reader.GetOrdinal("name")),
-                    Description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
+                    Description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
                     CategoryId = reader.IsDBNull(reader.GetOrdinal("category_id")) ? Guid.Empty : reader.GetGuid(reader.GetOrdinal("category_id")),
                     CategoryName = reader.IsDBNull(reader.GetOrdinal("category_name")) ? null : reader.GetString(reader.GetOrdinal("category_name")),
                     Price = reader.GetDecimal(reader.GetOrdinal("price")),
@@ -98,7 +98,7 @@ namespace MicroServiceProduct.Infraestructure.Repository
                 {
                     Id = reader.GetGuid(reader.GetOrdinal("id")),
                     Name = reader.GetString(reader.GetOrdinal("name")),
-                    Description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
+                    Description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
                     CategoryId = reader.IsDBNull(reader.GetOrdinal("category_id")) ? Guid.Empty : reader.GetGuid(reader.GetOrdinal("category_id")),
                     CategoryName = reader.IsDBNull(reader.GetOrdinal("category_name")) ? null : reader.GetString(reader.GetOrdinal("category_name")),
                     Price = reader.GetDecimal(reader.GetOrdinal("price")),
