@@ -2,21 +2,35 @@
 @model LibraryWeb.Pages.Distributors.IndexModel
 @{
     ViewData["Title"] = "Distribuidores";
+    int startNumber = (Model.Page - 1) * Model.PageSize;
 }
 
 <div class="card shadow-custom">
-    <div class="card-header card-header-blue d-flex align-items-center justify-content-between">
-        <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Distribuidores</h5>
-        @if (User.IsInRole("Admin"))
-        {
-            <a asp-page="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Añadir Distribuidor</a>
-        }
+    <div class="card-header card-header-blue d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h5 class="mb-0 text-white"><i class="fas fa-truck me-2"></i>Distribuidores</h5>
+        <div class="d-flex align-items-center gap-2">
+            <form method="get" class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 small text-white">Mostrar</label>
+                <select name="pageSize" class="form-select form-select-sm" onchange="this.form.submit()">
+                    @foreach (var size in new[] { 10, 20, 50, 100 })
+                    {
+                        <option value="@size" selected="@(Model.PageSize == size)">@size</option>
+                    }
+                </select>
+                <input type="hidden" name="page" value="1" />
+            </form>
+            @if (User.IsInRole("Admin"))
+            {
+                <a asp-page="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Añadir Distribuidor</a>
+            }
+        </div>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
                     <tr>
+                        <th class="th-blue">N°</th>
                         <th class="th-blue">Nombre</th>
                         <th class="th-blue">Correo electrónico</th>
                         <th class="th-blue">Celular</th>
@@ -28,9 +42,13 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @{
+                        int i = 0;
+                    }
                     @foreach (var distributor in Model.Distributors)
                     {
                         <tr>
+                            <td>@(startNumber + (++i))</td>
                             <td>@distributor.Name </td>
                             <td>@distributor.ContactEmail</td>
                             <td>@distributor.Phone</td>
@@ -40,10 +58,12 @@
                                 <td class="text-center table-actions">
                                     <form method="post" asp-page-handler="Edit" asp-antiforgery="true" class="d-inline">
                                         <input type="hidden" name="id" value="@distributor.Id" />
-                                        <button type="submit" class="btn btn-warning btn-sm btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
+                                        <input type="hidden" name="page" value="@Model.Page" />
+                                        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                                        <button type="submit" class="btn btn-warning btn-sm btn-icon"><i class="fas fa-edit"></i> Editar</button>
                                     </form>
-                                    <button type="button" class="btn btn-danger btn-sm btn-icon" title="Eliminar" data-bs-toggle="modal" data-bs-target="#confirmDeleteDistributorModal" data-distributor-id="@distributor.Id">
-                                        <i class="fas fa-trash"></i>
+                                    <button type="button" class="btn btn-danger btn-sm btn-icon" data-bs-toggle="modal" data-bs-target="#confirmDeleteDistributorModal" data-distributor-id="@distributor.Id">
+                                        <i class="fas fa-trash"></i> Eliminar
                                     </button>
                                 </td>
                             }
@@ -56,6 +76,26 @@
         @if (!Model.Distributors.Any())
         {
             <div class="alert alert-info mb-0">No tienes distribuidores registrados.</div>
+        }
+
+        @if (Model.TotalPages > 1)
+        {
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Model.Page == 1 ? "disabled" : null)">
+                        <a class="page-link" asp-page="Index" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize">«</a>
+                    </li>
+                    @for (int p = 1; p <= Model.TotalPages; p++)
+                    {
+                        <li class="page-item @(p == Model.Page ? "active" : null)">
+                            <a class="page-link" asp-page="Index" asp-route-page="@p" asp-route-pageSize="@Model.PageSize">@p</a>
+                        </li>
+                    }
+                    <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : null)">
+                        <a class="page-link" asp-page="Index" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize">»</a>
+                    </li>
+                </ul>
+            </nav>
         }
     </div>
 </div>
@@ -71,6 +111,8 @@
                 <div class="modal-body">
                     ¿Estás seguro de que deseas eliminar este distribuidor?
                     <input type="hidden" id="deleteDistributorId" name="id" />
+                    <input type="hidden" name="page" value="@Model.Page" />
+                    <input type="hidden" name="pageSize" value="@Model.PageSize" />
                 </div>
                 <div class="modal-footer">
                     <button type="submit" class="btn btn-danger">Sí, eliminar</button>

@@ -15,6 +15,41 @@ namespace MicroServiceWeb.External.Http
         public ProductsApiClient(IHttpClientFactory f)=>_http=f.CreateClient("ProductsService");
         public async Task<IReadOnlyList<ProductDto>> GetAllAsync(CancellationToken ct)
             => await _http.GetFromJsonAsync<IReadOnlyList<ProductDto>>("api/products", ct) ?? Array.Empty<ProductDto>();
+        public async Task<PagedResult<ProductDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct)
+        {
+            // Llama al endpoint paginado: api/products/paged?page={page}&pageSize={pageSize}
+            var url = $"api/products/paged?page={page}&pageSize={pageSize}";
+            var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new PagedResult<ProductDto>(new List<ProductDto>(), page, pageSize, 0, 0);
+            }
+            try
+            {
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                // Se espera estructura: { items: [...], page: n, pageSize: n, totalItems: n, totalPages: n }
+                var items = new List<ProductDto>();
+                if (root.TryGetProperty("items", out var itemsProp) && itemsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in itemsProp.EnumerateArray())
+                    {
+                        try { var dto = System.Text.Json.JsonSerializer.Deserialize<ProductDto>(el.GetRawText(), options); if (dto != null) items.Add(dto); } catch { }
+                    }
+                }
+                int totalItems = root.TryGetProperty("totalItems", out var ti) && ti.TryGetInt32(out var tiVal) ? tiVal : items.Count;
+                int totalPages = root.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var tpVal) ? tpVal : (int)Math.Ceiling((double)totalItems / pageSize);
+                int currentPage = root.TryGetProperty("page", out var pg) && pg.TryGetInt32(out var pgVal) ? pgVal : page;
+                int currentPageSize = root.TryGetProperty("pageSize", out var ps) && ps.TryGetInt32(out var psVal) ? psVal : pageSize;
+                return new PagedResult<ProductDto>(items, currentPage, currentPageSize, totalItems, totalPages);
+            }
+            catch
+            {
+                return new PagedResult<ProductDto>(new List<ProductDto>(), page, pageSize, 0, 0);
+            }
+        }
         public async Task<ProductDto?> GetByIdAsync(Guid id, CancellationToken ct)
             => await _http.GetFromJsonAsync<ProductDto>($"api/products/{id}", ct);
         public async Task<ProductApiResult> CreateAsync(ProductCreateDto dto, CancellationToken ct)
