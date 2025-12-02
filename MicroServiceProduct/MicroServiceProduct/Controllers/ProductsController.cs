@@ -55,7 +55,7 @@ namespace MicroServiceProduct.Controllers
             [FromQuery] int pageSize = 10,
             CancellationToken ct = default)
         {
-            var list = await _svc.GetPagedAsync(page, pageSize, ct); // 👈 faltaba await y ct
+            var list = await _svc.GetPagedAsync(page, pageSize, ct);
             return Ok(list);
         }
 
