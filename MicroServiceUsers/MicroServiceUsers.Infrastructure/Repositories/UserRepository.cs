@@ -109,7 +109,7 @@ namespace MicroServiceUsers.Infrastructure.Repositories
                                password_hash, is_active, must_change_password 
                         FROM users 
                         WHERE is_active = TRUE 
-                        ORDER BY id";
+                        ORDER BY username";
 
             await using var conn = _database.GetConnection();
             await using var cmd = new NpgsqlCommand(sql, conn);

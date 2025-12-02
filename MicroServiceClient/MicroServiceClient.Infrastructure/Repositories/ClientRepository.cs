@@ -45,7 +45,7 @@ namespace MicroServiceClient.Infrastructure.Repositories
         public Client? Read(Guid id)
         {
             using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand("SELECT * FROM clients WHERE id = @id", conn);
+            using var cmd = new NpgsqlCommand("SELECT * FROM clients WHERE id = @id order by first_name", conn);
             cmd.Parameters.AddWithValue("@id", NpgsqlTypes.NpgsqlDbType.Uuid, id);
 
             using var reader = cmd.ExecuteReader();

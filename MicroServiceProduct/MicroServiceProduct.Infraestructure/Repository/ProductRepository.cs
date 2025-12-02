@@ -1,11 +1,13 @@
+using MicroServiceProduct.Domain.Interfaces;
+using MicroServiceProduct.Domain.Models;
+using MicroServiceProduct.Domain.Services;
+using Npgsql;
+using ServiceCommon.Domain.Models;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
-using MicroServiceProduct.Domain.Models;
-using MicroServiceProduct.Domain.Interfaces;
-using MicroServiceProduct.Domain.Services;
 
 namespace MicroServiceProduct.Infraestructure.Repository
 {
@@ -107,6 +109,65 @@ namespace MicroServiceProduct.Infraestructure.Repository
                 });
             }
             return products;
+        }
+
+        public async Task<PagedResult<Product>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            var result = new PagedResult<Product>
+            {
+                Page = page,
+                PageSize = pageSize
+            };
+
+            await using var conn = (NpgsqlConnection)_database.GetConnection();
+
+            await using (var countCmd = new NpgsqlCommand("SELECT COUNT(*) FROM products p WHERE p.is_active = TRUE", conn))
+            {
+                result.TotalItems = Convert.ToInt32(await countCmd.ExecuteScalarAsync(ct));
+            }
+
+            var offset = (page - 1) * pageSize;
+            var sql = @"SELECT p.*, c.name AS category_name 
+                        FROM products p 
+                        LEFT JOIN categories c ON p.category_id = c.id
+                        WHERE p.is_active = TRUE
+                        ORDER BY p.name
+                        LIMIT @limit OFFSET @offset";
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@limit", pageSize);
+            cmd.Parameters.AddWithValue("@offset", offset);
+
+            var items = new List<Product>();
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                items.Add(new Product
+                {
+                    Id = reader.GetGuid(reader.GetOrdinal("id")),
+                    Name = reader.GetString(reader.GetOrdinal("name")),
+                    Description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
+                    CategoryId = reader.IsDBNull(reader.GetOrdinal("category_id")) ? Guid.Empty : reader.GetGuid(reader.GetOrdinal("category_id")),
+                    CategoryName = reader.IsDBNull(reader.GetOrdinal("category_name")) ? null : reader.GetString(reader.GetOrdinal("category_name")),
+                    Price = reader.GetDecimal(reader.GetOrdinal("price")),
+                    Stock = reader.GetInt32(reader.GetOrdinal("stock")),
+                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+                });
+            }
+
+            result.Items = items;
+            return result;
+        }
+
+        public async Task<int> CountAsync(CancellationToken ct = default)
+        {
+            await using var conn = (NpgsqlConnection)_database.GetConnection();
+            await using var cmd = new NpgsqlCommand("SELECT COUNT(*) FROM products p WHERE p.is_active = TRUE", conn);
+            var count = await cmd.ExecuteScalarAsync(ct);
+            return Convert.ToInt32(count);
         }
     }
 }

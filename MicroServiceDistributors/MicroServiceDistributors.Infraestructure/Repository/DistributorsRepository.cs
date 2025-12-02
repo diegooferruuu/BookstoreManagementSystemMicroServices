@@ -32,7 +32,7 @@ namespace ServiceDistributors.Infrastructure.Repositories
         public Distributor? Read(Guid id)
         {
             using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand("SELECT * FROM distributors WHERE id = @id", conn);
+            using var cmd = new NpgsqlCommand("SELECT * FROM distributors WHERE id = @id order by name", conn);
             cmd.Parameters.AddWithValue("@id", NpgsqlTypes.NpgsqlDbType.Uuid, id);
 
             using var reader = cmd.ExecuteReader();
