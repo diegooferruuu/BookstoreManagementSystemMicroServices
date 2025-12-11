@@ -4,11 +4,13 @@ using MicroServiceUsers.Domain.Models;
 using MicroServiceUsers.Domain.Interfaces;
 using MicroServiceUsers.Domain.Validations;
 using System.Threading;
+using Microsoft.AspNetCore.Authorization;
 
 namespace MicroServiceUsers.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UserController : ControllerBase
     {
         private readonly IUserService _service;

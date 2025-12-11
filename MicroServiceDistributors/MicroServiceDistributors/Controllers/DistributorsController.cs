@@ -1,4 +1,5 @@
 ﻿using MicroServiceDistributors.Domain.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using MicroServiceDistributors.Application.DTOs;
@@ -10,6 +11,7 @@ using System.Linq;
 namespace MicroServiceDistributors.API.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class DistributorsController : ControllerBase
     {
