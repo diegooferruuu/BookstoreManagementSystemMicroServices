@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MicroServiceClient.Domain.Models;
 using MicroServiceClient.Domain.Interfaces;
 using MicroServiceClient.Domain.Validations;
@@ -6,6 +7,7 @@ using MicroServiceClient.Domain.Validations;
 namespace MicroServiceClient.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class ClientController : ControllerBase
     {
@@ -85,4 +87,4 @@ namespace MicroServiceClient.Controllers
             return NoContent();
         }
     }
-    }
+}
