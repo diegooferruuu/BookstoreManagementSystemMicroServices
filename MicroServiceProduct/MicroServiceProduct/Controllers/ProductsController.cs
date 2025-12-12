@@ -57,7 +57,9 @@ public class ProductsController : ControllerBase
         model.Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id;
         model.CreatedAt = DateTime.UtcNow;
         _svc.Create(model);
-        return CreatedAtAction(nameof(Get), new { id = model.Id }, model);
+        // Read back the created product so CategoryName (and any DB-populated fields) are present in the response
+        var created = _svc.Read(model.Id);
+        return CreatedAtAction(nameof(Get), new { id = model.Id }, created ?? model);
     }
 
     /// <summary>
