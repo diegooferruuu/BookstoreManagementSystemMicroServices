@@ -15,7 +15,6 @@ namespace MicroServiceProduct.Application.Services
         List<Product> GetAll();
 
         Task<PagedResult<Product>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default);
-        Task<int> CountAsync(CancellationToken ct = default);
     }
 }
 

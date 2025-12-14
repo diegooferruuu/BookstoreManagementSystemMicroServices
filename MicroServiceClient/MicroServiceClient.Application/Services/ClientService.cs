@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MicroServiceClient.Application.Services
@@ -19,6 +20,9 @@ namespace MicroServiceClient.Application.Services
         }
 
         public List<Client> GetAll() => _repository.GetAll();
+
+        public Task<PagedResult<Client>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default) 
+            => _repository.GetPagedAsync(page, pageSize, ct);
 
         public Client? Read(Guid id) => _repository.Read(id);
 

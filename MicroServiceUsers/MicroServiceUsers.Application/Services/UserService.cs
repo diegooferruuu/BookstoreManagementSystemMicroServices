@@ -22,6 +22,9 @@ namespace MicroServiceUsers.Application.Services
         public Task<List<User>> GetAllAsync(CancellationToken ct = default) 
             => _repository.GetAllAsync(ct);
 
+        public Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default)
+            => _repository.GetPagedAsync(page, pageSize, ct);
+
         public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default) 
             => _repository.GetByIdAsync(id, ct);
 

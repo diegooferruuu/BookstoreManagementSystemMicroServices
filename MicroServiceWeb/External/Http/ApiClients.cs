@@ -1,11 +1,12 @@
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Net.Http.Headers;
 
 namespace MicroServiceWeb.External.Http
 {
@@ -36,7 +37,12 @@ namespace MicroServiceWeb.External.Http
                 {
                     foreach (var el in itemsProp.EnumerateArray())
                     {
-                        try { var dto = System.Text.Json.JsonSerializer.Deserialize<ProductDto>(el.GetRawText(), options); if (dto != null) items.Add(dto); } catch { }
+                        try 
+                        { 
+                            var dto = System.Text.Json.JsonSerializer.Deserialize<ProductDto>(el.GetRawText(), options); 
+                            if (dto != null) items.Add(dto); 
+                        } 
+                        catch { }
                     }
                 }
                 int totalItems = root.TryGetProperty("totalItems", out var ti) && ti.TryGetInt32(out var tiVal) ? tiVal : items.Count;
@@ -98,6 +104,49 @@ namespace MicroServiceWeb.External.Http
         public async Task<UserDto?> GetByIdAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<UserDto>($"api/User/{id}", ct);
         public async Task<IReadOnlyList<UserDto>> GetAllAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<UserDto>>("api/User", ct) ?? Array.Empty<UserDto>();
         public async Task<IReadOnlyList<UserFullDto>> GetAllRawAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<UserFullDto>>("api/User", ct) ?? Array.Empty<UserFullDto>();
+        public async Task<PagedResult<UserFullDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct)
+        {
+            var url = $"api/User/paged?page={page}&pageSize={pageSize}";
+            var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+                return new PagedResult<UserFullDto>(new List<UserFullDto>(), page, pageSize, 0, 0);
+            try
+            {
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                var items = new List<UserFullDto>();
+                if (root.TryGetProperty("items", out var itemsProp) && itemsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in itemsProp.EnumerateArray())
+                    {
+                        try
+                        {
+                            var id = el.TryGetProperty("id", out var idP) && Guid.TryParse(idP.GetString(), out var gid) ? gid : Guid.Empty;
+                            var username = el.TryGetProperty("username", out var unP) ? unP.GetString() ?? "" : "";
+                            var email = el.TryGetProperty("email", out var emP) ? emP.GetString() : null;
+                            var firstName = el.TryGetProperty("firstName", out var fnP) ? fnP.GetString() : null;
+                            var middleName = el.TryGetProperty("middleName", out var mnP) ? mnP.GetString() : null;
+                            var lastName = el.TryGetProperty("lastName", out var lnP) ? lnP.GetString() : null;
+                            var mustChange = el.TryGetProperty("mustChangePassword", out var mcP) && mcP.GetBoolean();
+                            var pwdHash = el.TryGetProperty("passwordHash", out var phP) ? phP.GetString() ?? "" : "";
+                            items.Add(new UserFullDto(id, username, email, firstName, middleName, lastName, mustChange, new List<string>(), pwdHash));
+                        }
+                        catch { }
+                    }
+                }
+                int totalItems = root.TryGetProperty("totalItems", out var ti) && ti.TryGetInt32(out var tiVal) ? tiVal : items.Count;
+                int totalPages = root.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var tpVal) ? tpVal : (int)Math.Ceiling((double)totalItems / pageSize);
+                int currentPage = root.TryGetProperty("page", out var pg) && pg.TryGetInt32(out var pgVal) ? pgVal : page;
+                int currentPageSize = root.TryGetProperty("pageSize", out var ps) && ps.TryGetInt32(out var psVal) ? psVal : pageSize;
+                return new PagedResult<UserFullDto>(items, currentPage, currentPageSize, totalItems, totalPages);
+            }
+            catch
+            {
+                return new PagedResult<UserFullDto>(new List<UserFullDto>(), page, pageSize, 0, 0);
+            }
+        }
         public async Task<IReadOnlyList<string>> GetRolesAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<string>>($"api/User/{id}/roles", ct) ?? Array.Empty<string>();
         public async Task<UserFullDto?> SearchAsync(string userOrEmail, CancellationToken ct) => await _http.GetFromJsonAsync<UserFullDto>($"api/User/search/{Uri.EscapeDataString(userOrEmail)}", ct);
         public async Task<AuthLoginResult> LoginAsync(AuthLoginRequest request, CancellationToken ct) { var resp = await _http.PostAsJsonAsync("api/Auth/login", request, ct); return await ParseAuthResponse(resp, ct); }
@@ -234,6 +283,42 @@ namespace MicroServiceWeb.External.Http
         private readonly HttpClient _http; public ClientsApiClient(IHttpClientFactory f)=>_http=f.CreateClient("ClientsService");
         public async Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<ClientDto>($"api/Client/{id}", ct);
         public async Task<IReadOnlyList<ClientDto>> GetAllAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<ClientDto>>("api/Client", ct) ?? Array.Empty<ClientDto>();
+        public async Task<PagedResult<ClientDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct)
+        {
+            var url = $"api/Client/paged?page={page}&pageSize={pageSize}";
+            var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+                return new PagedResult<ClientDto>(new List<ClientDto>(), page, pageSize, 0, 0);
+            try
+            {
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                var items = new List<ClientDto>();
+                if (root.TryGetProperty("items", out var itemsProp) && itemsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in itemsProp.EnumerateArray())
+                    {
+                        try
+                        {
+                            var dto = System.Text.Json.JsonSerializer.Deserialize<ClientDto>(el.GetRawText(), options);
+                            if (dto != null) items.Add(dto);
+                        }
+                        catch { }
+                    }
+                }
+                int totalItems = root.TryGetProperty("totalItems", out var ti) && ti.TryGetInt32(out var tiVal) ? tiVal : items.Count;
+                int totalPages = root.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var tpVal) ? tpVal : (int)Math.Ceiling((double)totalItems / pageSize);
+                int currentPage = root.TryGetProperty("page", out var pg) && pg.TryGetInt32(out var pgVal) ? pgVal : page;
+                int currentPageSize = root.TryGetProperty("pageSize", out var ps) && ps.TryGetInt32(out var psVal) ? psVal : pageSize;
+                return new PagedResult<ClientDto>(items, currentPage, currentPageSize, totalItems, totalPages);
+            }
+            catch
+            {
+                return new PagedResult<ClientDto>(new List<ClientDto>(), page, pageSize, 0, 0);
+            }
+        }
         public async Task<ClientApiResult> CreateAsync(ClientCreateDto dto, CancellationToken ct) { var resp = await _http.PostAsJsonAsync("api/Client", dto, ct); return await BuildResult(resp, ct); }
         public async Task<ClientApiResult> UpdateAsync(Guid id, ClientUpdateDto dto, CancellationToken ct) { var resp = await _http.PutAsJsonAsync($"api/Client/{id}", dto, ct); return await BuildResult(resp, ct); }
         public async Task<bool> DeleteAsync(Guid id, CancellationToken ct) { var resp = await _http.DeleteAsync($"api/Client/{id}", ct); return resp.IsSuccessStatusCode; }
@@ -272,14 +357,56 @@ namespace MicroServiceWeb.External.Http
     {
         private readonly HttpClient _http;
         public DistributorsApiClient(IHttpClientFactory factory) => _http = factory.CreateClient("DistributorsService");
-        public async Task<DistributorDto?> GetByIdAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<DistributorDto>($"api/Distributors/{id}", ct);
-        public async Task<IReadOnlyList<DistributorDto>> GetAllAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<DistributorDto>>("api/Distributors", ct) ?? Array.Empty<DistributorDto>();
+        public async Task<DistributorDto?> GetByIdAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<DistributorDto>($"api/distributors/{id}", ct);
+        public async Task<IReadOnlyList<DistributorDto>> GetAllAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<DistributorDto>>("api/distributors", ct) ?? Array.Empty<DistributorDto>();
+        public async Task<PagedResult<DistributorDto>> GetPagedAsync(int? page_parameter, int? pageSize_parameter, CancellationToken ct)
+        {
+            var page = page_parameter ?? 1;
+            var pageSize = pageSize_parameter ?? 10;
+            // Llama al endpoint paginado: api/distributors/paged?page={page}&pageSize={pageSize}
+            var url = $"api/distributors/paged?page={page}&pageSize={pageSize}";
+            var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new PagedResult<DistributorDto>(new List<DistributorDto>(), page, pageSize, 0, 0);
+            }
+            try
+            {
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                // Se espera estructura: { items: [...], page: n, pageSize: n, totalItems: n, totalPages: n }
+                var items = new List<DistributorDto>();
+                if (root.TryGetProperty("items", out var itemsProp) && itemsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in itemsProp.EnumerateArray())
+                    {
+                        try
+                        {
+                            var dto = System.Text.Json.JsonSerializer.Deserialize<DistributorDto>(el.GetRawText(), options);
+                            if (dto != null) items.Add(dto);
+                        }
+                        catch { }
+                    }
+                }
+                int totalItems = root.TryGetProperty("totalItems", out var ti) && ti.TryGetInt32(out var tiVal) ? tiVal : items.Count;
+                int totalPages = root.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var tpVal) ? tpVal : (int)Math.Ceiling((double)totalItems / pageSize);
+                int currentPage = root.TryGetProperty("page", out var pg) && pg.TryGetInt32(out var pgVal) ? pgVal : page;
+                int currentPageSize = root.TryGetProperty("pageSize", out var ps) && ps.TryGetInt32(out var psVal) ? psVal : pageSize;
+                return new PagedResult<DistributorDto>(items, currentPage, currentPageSize, totalItems, totalPages);
+            }
+            catch
+            {
+                return new PagedResult<DistributorDto>(new List<DistributorDto>(), page, pageSize, 0, 0);
+            }
+        }
         public async Task<DistributorApiResult> CreateAsync(DistributorCreateDto dto, CancellationToken ct)
-        { var resp = await _http.PostAsJsonAsync("api/Distributors", dto, ct); return await ParseResult(resp, ct); }
+        { var resp = await _http.PostAsJsonAsync("api/distributors", dto, ct); return await ParseResult(resp, ct); }
         public async Task<DistributorApiResult> UpdateAsync(Guid id, DistributorUpdateDto dto, CancellationToken ct)
-        { var resp = await _http.PutAsJsonAsync($"api/Distributors/{id}", dto, ct); return await ParseResult(resp, ct); }
+        { var resp = await _http.PutAsJsonAsync($"api/distributors/{id}", dto, ct); return await ParseResult(resp, ct); }
         public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
-        { var resp = await _http.DeleteAsync($"api/Distributors/{id}", ct); return resp.IsSuccessStatusCode; }
+        { var resp = await _http.DeleteAsync($"api/distributors/{id}", ct); return resp.IsSuccessStatusCode; }
         private static async Task<DistributorApiResult> ParseResult(HttpResponseMessage resp, CancellationToken ct)
         {
             var result = new DistributorApiResult { Success = resp.IsSuccessStatusCode };

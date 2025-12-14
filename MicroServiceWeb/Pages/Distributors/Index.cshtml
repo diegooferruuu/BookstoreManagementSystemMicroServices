@@ -11,13 +11,22 @@
         <div class="d-flex align-items-center gap-2">
             <form method="get" class="d-flex align-items-center gap-2">
                 <label class="form-label mb-0 small text-white">Mostrar</label>
-                <select name="pageSize" class="form-select form-select-sm" onchange="this.form.submit()">
-                    @foreach (var size in new[] { 10, 20, 50, 100 })
-                    {
-                        <option value="@size" selected="@(Model.PageSize == size)">@size</option>
-                    }
-                </select>
-                <input type="hidden" name="page" value="1" />
+                <div class="dropdown">
+                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-width: 70px;">
+                        @Model.PageSize
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        @foreach (var size in new[] { 10, 20, 50, 100 })
+                        {
+                            <li>
+                                <button type="submit" name="pageSize" value="@size" class="dropdown-item @(Model.PageSize == size ? "active" : "")">
+                                    @size registros
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                <input type="hidden" name="pageNumber" value="1" />
             </form>
             @if (User.IsInRole("Admin"))
             {
@@ -58,7 +67,7 @@
                                 <td class="text-center table-actions">
                                     <form method="post" asp-page-handler="Edit" asp-antiforgery="true" class="d-inline">
                                         <input type="hidden" name="id" value="@distributor.Id" />
-                                        <input type="hidden" name="page" value="@Model.Page" />
+                                        <input type="hidden" name="pageNumber" value="@Model.Page" />
                                         <input type="hidden" name="pageSize" value="@Model.PageSize" />
                                         <button type="submit" class="btn btn-warning btn-sm btn-icon"><i class="fas fa-edit"></i> Editar</button>
                                     </form>
@@ -80,19 +89,48 @@
 
         @if (Model.TotalPages > 1)
         {
-            <nav>
+            <nav class="d-flex justify-content-between align-items-center mt-3">
+                <div class="text-muted small">
+                    Página @Model.Page de @Model.TotalPages
+                </div>
                 <ul class="pagination pagination-sm mb-0">
-                    <li class="page-item @(Model.Page == 1 ? "disabled" : null)">
-                        <a class="page-link" asp-page="Index" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize">«</a>
+                    <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                        <a class="page-link rounded-start-pill" asp-page="Index" asp-route-pageNumber="1" asp-route-pageSize="@Model.PageSize" title="Primera">
+                            <i class="fas fa-angles-left"></i>
+                        </a>
                     </li>
-                    @for (int p = 1; p <= Model.TotalPages; p++)
+                    <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                        <a class="page-link" asp-page="Index" asp-route-pageNumber="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" title="Anterior">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                    @{
+                        int start = Math.Max(1, Model.Page - 2);
+                        int end = Math.Min(Model.TotalPages, Model.Page + 2);
+                        if (start > 1)
+                        {
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        }
+                    }
+                    @for (int p = start; p <= end; p++)
                     {
-                        <li class="page-item @(p == Model.Page ? "active" : null)">
-                            <a class="page-link" asp-page="Index" asp-route-page="@p" asp-route-pageSize="@Model.PageSize">@p</a>
+                        <li class="page-item @(p == Model.Page ? "active" : "")">
+                            <a class="page-link" asp-page="Index" asp-route-pageNumber="@p" asp-route-pageSize="@Model.PageSize">@p</a>
                         </li>
                     }
-                    <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : null)">
-                        <a class="page-link" asp-page="Index" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize">»</a>
+                    @if (end < Model.TotalPages)
+                    {
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    }
+                    <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                        <a class="page-link" asp-page="Index" asp-route-pageNumber="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize" title="Siguiente">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                        <a class="page-link rounded-end-pill" asp-page="Index" asp-route-pageNumber="@Model.TotalPages" asp-route-pageSize="@Model.PageSize" title="Última">
+                            <i class="fas fa-angles-right"></i>
+                        </a>
                     </li>
                 </ul>
             </nav>
@@ -111,7 +149,7 @@
                 <div class="modal-body">
                     ¿Estás seguro de que deseas eliminar este distribuidor?
                     <input type="hidden" id="deleteDistributorId" name="id" />
-                    <input type="hidden" name="page" value="@Model.Page" />
+                    <input type="hidden" name="pageNumber" value="@Model.Page" />
                     <input type="hidden" name="pageSize" value="@Model.PageSize" />
                 </div>
                 <div class="modal-footer">

@@ -23,29 +23,21 @@ namespace LibraryWeb.Pages.Clients
             _api = api;
         }
 
-        public async Task OnGetAsync(CancellationToken ct, int? page, int? pageSize)
+        public async Task OnGetAsync(CancellationToken ct, int? pageNumber, int? pageSize)
         {
-            var all = await _api.GetAllAsync(ct);
-            TotalItems = all.Count;
-
             if (pageSize.HasValue && pageSize.Value > 0)
                 PageSize = pageSize.Value;
-            if (page.HasValue && page.Value > 0)
-                Page = page.Value;
+            if (pageNumber.HasValue && pageNumber.Value > 0)
+                Page = pageNumber.Value;
 
             if (PageSize < 1) PageSize = 10;
             if (PageSize > 100) PageSize = 100;
-            if (TotalItems == 0)
-            {
-                Clients = new List<ClientDto>();
-                Page = 1;
-                return;
-            }
-            var maxPage = (int)Math.Ceiling((double)TotalItems / PageSize);
-            if (Page > maxPage) Page = maxPage;
 
-            
-            Clients = (await _api.GetAllAsync(ct)).ToList();
+            var paged = await _api.GetPagedAsync(Page, PageSize, ct);
+            TotalItems = paged.TotalItems;
+            Page = paged.Page;
+            PageSize = paged.PageSize;
+            Clients = paged.Items.ToList();
         }
 
         public IActionResult OnPostEdit(Guid id)
@@ -58,7 +50,7 @@ namespace LibraryWeb.Pages.Clients
         {
             var ok = await _api.DeleteAsync(id, ct);
             if (!ok) TempData["ErrorMessage"] = "No se pudo eliminar";
-            return RedirectToPage();
+            return RedirectToPage(new { pageNumber = Page, pageSize = PageSize });
         }
     }
 }

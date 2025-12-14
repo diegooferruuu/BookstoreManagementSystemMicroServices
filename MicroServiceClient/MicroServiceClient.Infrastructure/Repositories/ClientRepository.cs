@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MicroServiceClient.Infrastructure.Repositories
@@ -22,45 +23,100 @@ namespace MicroServiceClient.Infrastructure.Repositories
         {
             var clients = new List<Client>();
             using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand("SELECT * FROM clients WHERE is_active = TRUE ORDER BY last_name, first_name", conn);
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT * FROM clients WHERE is_active = TRUE ORDER BY last_name, first_name";
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())
             {
-                clients.Add(new Client
-                {
-                    Id = reader.GetGuid(reader.GetOrdinal("id")),
-                    FirstName = reader.GetString(reader.GetOrdinal("first_name")),
-                    LastName = reader.GetString(reader.GetOrdinal("last_name")),
-                    Email = reader.IsDBNull(reader.GetOrdinal("email")) ? null : reader.GetString(reader.GetOrdinal("email")),
-                    Phone = reader.IsDBNull(reader.GetOrdinal("phone")) ? null : reader.GetString(reader.GetOrdinal("phone")),
-                    Address = reader.IsDBNull(reader.GetOrdinal("address")) ? null : reader.GetString(reader.GetOrdinal("address")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
-                });
+                clients.Add(MapClient(reader));
             }
 
             return clients;
         }
 
+        public async Task<int> CountAsync(CancellationToken ct = default)
+        {
+            await using var conn = (NpgsqlConnection)_database.GetConnection();
+            await using var cmd = new NpgsqlCommand("SELECT COUNT(*) FROM clients WHERE is_active = TRUE", conn);
+            var count = await cmd.ExecuteScalarAsync(ct);
+            return Convert.ToInt32(count);
+        }
+
+        public async Task<PagedResult<Client>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            var clients = new List<Client>();
+            int offset = (page - 1) * pageSize;
+
+            using var conn = _database.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"SELECT * FROM clients 
+                                WHERE is_active = TRUE 
+                                ORDER BY last_name, first_name 
+                                LIMIT @limit OFFSET @offset";
+
+            var paramLimit = cmd.CreateParameter();
+            paramLimit.ParameterName = "@limit";
+            paramLimit.Value = pageSize;
+            cmd.Parameters.Add(paramLimit);
+
+            var paramOffset = cmd.CreateParameter();
+            paramOffset.ParameterName = "@offset";
+            paramOffset.Value = offset;
+            cmd.Parameters.Add(paramOffset);
+
+            using var reader = cmd.ExecuteReader();
+
+            int colId = reader.GetOrdinal("id");
+            int colFirstName = reader.GetOrdinal("first_name");
+            int colLastName = reader.GetOrdinal("last_name");
+            int colEmail = reader.GetOrdinal("email");
+            int colPhone = reader.GetOrdinal("phone");
+            int colAddress = reader.GetOrdinal("address");
+            int colCreatedAt = reader.GetOrdinal("created_at");
+
+            while (await ((NpgsqlDataReader)reader).ReadAsync(ct))
+            {
+                clients.Add(new Client
+                {
+                    Id = reader.GetGuid(colId),
+                    FirstName = reader.GetString(colFirstName),
+                    LastName = reader.GetString(colLastName),
+                    Email = reader.IsDBNull(colEmail) ? null : reader.GetString(colEmail),
+                    Phone = reader.IsDBNull(colPhone) ? null : reader.GetString(colPhone),
+                    Address = reader.IsDBNull(colAddress) ? null : reader.GetString(colAddress),
+                    CreatedAt = reader.GetDateTime(colCreatedAt)
+                });
+            }
+
+            return new PagedResult<Client>
+            {
+                Items = clients,
+                Page = page,
+                PageSize = pageSize,
+                TotalItems = await CountAsync(ct)
+            };
+        }
+
         public Client? Read(Guid id)
         {
             using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand("SELECT * FROM clients WHERE id = @id order by first_name", conn);
-            cmd.Parameters.AddWithValue("@id", NpgsqlTypes.NpgsqlDbType.Uuid, id);
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT * FROM clients WHERE id = @id";
+
+            var paramId = cmd.CreateParameter();
+            paramId.ParameterName = "@id";
+            paramId.Value = id;
+            cmd.Parameters.Add(paramId);
 
             using var reader = cmd.ExecuteReader();
             if (reader.Read())
             {
-                return new Client
-                {
-                    Id = reader.GetGuid(reader.GetOrdinal("id")),
-                    FirstName = reader.GetString(reader.GetOrdinal("first_name")),
-                    LastName = reader.GetString(reader.GetOrdinal("last_name")),
-                    Email = reader.IsDBNull(reader.GetOrdinal("email")) ? null : reader.GetString(reader.GetOrdinal("email")),
-                    Phone = reader.IsDBNull(reader.GetOrdinal("phone")) ? null : reader.GetString(reader.GetOrdinal("phone")),
-                    Address = reader.IsDBNull(reader.GetOrdinal("address")) ? null : reader.GetString(reader.GetOrdinal("address")),
-                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
-                };
+                return MapClient(reader);
             }
 
             return null;
@@ -69,15 +125,35 @@ namespace MicroServiceClient.Infrastructure.Repositories
         public void Create(Client client)
         {
             using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand(@"
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
                 INSERT INTO clients (first_name, last_name, email, phone, address)
-                VALUES (@first_name, @last_name, @email, @phone, @address)", conn);
+                VALUES (@first_name, @last_name, @email, @phone, @address)";
 
-            cmd.Parameters.AddWithValue("@first_name", client.FirstName);
-            cmd.Parameters.AddWithValue("@last_name", client.LastName);
-            cmd.Parameters.AddWithValue("@email", client.Email ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@phone", client.Phone ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@address", client.Address ?? (object)DBNull.Value);
+            var paramFirstName = cmd.CreateParameter();
+            paramFirstName.ParameterName = "@first_name";
+            paramFirstName.Value = client.FirstName;
+            cmd.Parameters.Add(paramFirstName);
+
+            var paramLastName = cmd.CreateParameter();
+            paramLastName.ParameterName = "@last_name";
+            paramLastName.Value = client.LastName;
+            cmd.Parameters.Add(paramLastName);
+
+            var paramEmail = cmd.CreateParameter();
+            paramEmail.ParameterName = "@email";
+            paramEmail.Value = client.Email ?? (object)DBNull.Value;
+            cmd.Parameters.Add(paramEmail);
+
+            var paramPhone = cmd.CreateParameter();
+            paramPhone.ParameterName = "@phone";
+            paramPhone.Value = client.Phone ?? (object)DBNull.Value;
+            cmd.Parameters.Add(paramPhone);
+
+            var paramAddress = cmd.CreateParameter();
+            paramAddress.ParameterName = "@address";
+            paramAddress.Value = client.Address ?? (object)DBNull.Value;
+            cmd.Parameters.Add(paramAddress);
 
             cmd.ExecuteNonQuery();
         }
@@ -85,21 +161,45 @@ namespace MicroServiceClient.Infrastructure.Repositories
         public void Update(Client client)
         {
             using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand(@"
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
                 UPDATE clients SET 
                     first_name = @first_name,
                     last_name = @last_name,
                     email = @email,
                     phone = @phone,
                     address = @address
-                WHERE id = @id", conn);
+                WHERE id = @id";
 
-            cmd.Parameters.AddWithValue("@id", client.Id);
-            cmd.Parameters.AddWithValue("@first_name", client.FirstName);
-            cmd.Parameters.AddWithValue("@last_name", client.LastName);
-            cmd.Parameters.AddWithValue("@email", client.Email ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@phone", client.Phone ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@address", client.Address ?? (object)DBNull.Value);
+            var paramId = cmd.CreateParameter();
+            paramId.ParameterName = "@id";
+            paramId.Value = client.Id;
+            cmd.Parameters.Add(paramId);
+
+            var paramFirstName = cmd.CreateParameter();
+            paramFirstName.ParameterName = "@first_name";
+            paramFirstName.Value = client.FirstName;
+            cmd.Parameters.Add(paramFirstName);
+
+            var paramLastName = cmd.CreateParameter();
+            paramLastName.ParameterName = "@last_name";
+            paramLastName.Value = client.LastName;
+            cmd.Parameters.Add(paramLastName);
+
+            var paramEmail = cmd.CreateParameter();
+            paramEmail.ParameterName = "@email";
+            paramEmail.Value = client.Email ?? (object)DBNull.Value;
+            cmd.Parameters.Add(paramEmail);
+
+            var paramPhone = cmd.CreateParameter();
+            paramPhone.ParameterName = "@phone";
+            paramPhone.Value = client.Phone ?? (object)DBNull.Value;
+            cmd.Parameters.Add(paramPhone);
+
+            var paramAddress = cmd.CreateParameter();
+            paramAddress.ParameterName = "@address";
+            paramAddress.Value = client.Address ?? (object)DBNull.Value;
+            cmd.Parameters.Add(paramAddress);
 
             cmd.ExecuteNonQuery();
         }
@@ -107,9 +207,29 @@ namespace MicroServiceClient.Infrastructure.Repositories
         public void Delete(Guid id)
         {
             using var conn = _database.GetConnection();
-            using var cmd = new NpgsqlCommand("UPDATE clients SET is_active = FALSE WHERE id = @id", conn);
-            cmd.Parameters.AddWithValue("@id", NpgsqlTypes.NpgsqlDbType.Uuid, id);
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE clients SET is_active = FALSE WHERE id = @id";
+
+            var paramId = cmd.CreateParameter();
+            paramId.ParameterName = "@id";
+            paramId.Value = id;
+            cmd.Parameters.Add(paramId);
+
             cmd.ExecuteNonQuery();
+        }
+
+        private static Client MapClient(System.Data.IDataReader reader)
+        {
+            return new Client
+            {
+                Id = reader.GetGuid(reader.GetOrdinal("id")),
+                FirstName = reader.GetString(reader.GetOrdinal("first_name")),
+                LastName = reader.GetString(reader.GetOrdinal("last_name")),
+                Email = reader.IsDBNull(reader.GetOrdinal("email")) ? null : reader.GetString(reader.GetOrdinal("email")),
+                Phone = reader.IsDBNull(reader.GetOrdinal("phone")) ? null : reader.GetString(reader.GetOrdinal("phone")),
+                Address = reader.IsDBNull(reader.GetOrdinal("address")) ? null : reader.GetString(reader.GetOrdinal("address")),
+                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+            };
         }
     }
 }

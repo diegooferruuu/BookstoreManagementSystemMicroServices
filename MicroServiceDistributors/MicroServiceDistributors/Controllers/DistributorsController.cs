@@ -24,7 +24,17 @@ namespace MicroServiceDistributors.API.Controllers
         [HttpGet]
         public ActionResult<IEnumerable<DistributorDto>> GetAll()
         {
-            var list = _distributorService.GetAll().Select(ToDto);
+            var list =  _distributorService.GetAll().Select(ToDto);
+            return Ok(list);
+        }
+        [HttpGet("paged")]
+        [ProducesResponseType(typeof(PagedResult<DistributorDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<PagedResult<DistributorDto>>> GetPaged(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            CancellationToken ct = default)
+        {
+            var list = await _distributorService.GetPagedAsync(page, pageSize, ct);
             return Ok(list);
         }
 

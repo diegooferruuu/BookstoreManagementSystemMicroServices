@@ -33,9 +33,5 @@ namespace MicroServiceProduct.Application.Services
             return _repo.GetPagedAsync(page, pageSize, ct);
         }
 
-        Task<int> IProductService.CountAsync(CancellationToken ct)
-        {
-            return _repo.CountAsync(ct);
-        }
     }
 }

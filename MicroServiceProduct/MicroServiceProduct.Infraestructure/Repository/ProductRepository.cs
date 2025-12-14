@@ -110,6 +110,13 @@ namespace MicroServiceProduct.Infraestructure.Repository
             }
             return products;
         }
+        public async Task<int> CountAsync(CancellationToken ct = default)
+        {
+            await using var conn = (NpgsqlConnection)_database.GetConnection();
+            await using var cmd = new NpgsqlCommand("SELECT COUNT(*) FROM products p WHERE p.is_active = TRUE", conn);
+            var count = await cmd.ExecuteScalarAsync(ct);
+            return Convert.ToInt32(count);
+        }
 
         public async Task<PagedResult<Product>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default)
         {
@@ -120,15 +127,12 @@ namespace MicroServiceProduct.Infraestructure.Repository
             var result = new PagedResult<Product>
             {
                 Page = page,
-                PageSize = pageSize
+                PageSize = pageSize,
+                TotalItems = await CountAsync(ct)
             };
 
             await using var conn = (NpgsqlConnection)_database.GetConnection();
 
-            await using (var countCmd = new NpgsqlCommand("SELECT COUNT(*) FROM products p WHERE p.is_active = TRUE", conn))
-            {
-                result.TotalItems = Convert.ToInt32(await countCmd.ExecuteScalarAsync(ct));
-            }
 
             var offset = (page - 1) * pageSize;
             var sql = @"SELECT p.*, c.name AS category_name 
@@ -162,12 +166,6 @@ namespace MicroServiceProduct.Infraestructure.Repository
             return result;
         }
 
-        public async Task<int> CountAsync(CancellationToken ct = default)
-        {
-            await using var conn = (NpgsqlConnection)_database.GetConnection();
-            await using var cmd = new NpgsqlCommand("SELECT COUNT(*) FROM products p WHERE p.is_active = TRUE", conn);
-            var count = await cmd.ExecuteScalarAsync(ct);
-            return Convert.ToInt32(count);
-        }
+        
     }
 }

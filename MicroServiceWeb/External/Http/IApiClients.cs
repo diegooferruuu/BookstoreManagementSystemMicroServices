@@ -23,6 +23,7 @@ public interface IUsersApiClient
     Task<UserDto?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<UserDto>> GetAllAsync(CancellationToken ct);
     Task<IReadOnlyList<UserFullDto>> GetAllRawAsync(CancellationToken ct);
+    Task<PagedResult<UserFullDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct);
     Task<IReadOnlyList<string>> GetRolesAsync(Guid id, CancellationToken ct);
     Task<AuthLoginResult> LoginAsync(AuthLoginRequest request, CancellationToken ct);
     Task<UserFullDto?> SearchAsync(string userOrEmail, CancellationToken ct);
@@ -37,6 +38,7 @@ public interface IClientsApiClient
 {
     Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<ClientDto>> GetAllAsync(CancellationToken ct);
+    Task<PagedResult<ClientDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct);
     Task<ClientApiResult> CreateAsync(ClientCreateDto dto, CancellationToken ct);
     Task<ClientApiResult> UpdateAsync(Guid id, ClientUpdateDto dto, CancellationToken ct);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct);
@@ -45,6 +47,7 @@ public interface IDistributorsApiClient
 {
     Task<DistributorDto?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<DistributorDto>> GetAllAsync(CancellationToken ct);
+    Task<PagedResult<DistributorDto>> GetPagedAsync(int? page_parameter, int? pageSize_parameter, CancellationToken ct);
     Task<DistributorApiResult> CreateAsync(DistributorCreateDto dto, CancellationToken ct);
     Task<DistributorApiResult> UpdateAsync(Guid id, DistributorUpdateDto dto, CancellationToken ct);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct);
