@@ -1,4 +1,7 @@
-﻿using MicroServiceProduct.Application.Services;
+// New file: ProductsController
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MicroServiceProduct.Application.Services;
 using MicroServiceProduct.Domain.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
