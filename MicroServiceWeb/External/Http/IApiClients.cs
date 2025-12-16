@@ -9,6 +9,7 @@ public interface IProductsApiClient
 {
     // Productos
     Task<IReadOnlyList<ProductDto>> GetAllAsync(CancellationToken ct);
+    Task<PagedResult<ProductDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct); // nuevo método paginado
     Task<ProductDto?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<ProductApiResult> CreateAsync(ProductCreateDto dto, CancellationToken ct);
     Task<ProductApiResult> UpdateAsync(Guid id, ProductUpdateDto dto, CancellationToken ct);
@@ -22,6 +23,7 @@ public interface IUsersApiClient
     Task<UserDto?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<UserDto>> GetAllAsync(CancellationToken ct);
     Task<IReadOnlyList<UserFullDto>> GetAllRawAsync(CancellationToken ct);
+    Task<PagedResult<UserFullDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct);
     Task<IReadOnlyList<string>> GetRolesAsync(Guid id, CancellationToken ct);
     Task<AuthLoginResult> LoginAsync(AuthLoginRequest request, CancellationToken ct);
     Task<UserFullDto?> SearchAsync(string userOrEmail, CancellationToken ct);
@@ -36,6 +38,7 @@ public interface IClientsApiClient
 {
     Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<ClientDto>> GetAllAsync(CancellationToken ct);
+    Task<PagedResult<ClientDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct);
     Task<ClientApiResult> CreateAsync(ClientCreateDto dto, CancellationToken ct);
     Task<ClientApiResult> UpdateAsync(Guid id, ClientUpdateDto dto, CancellationToken ct);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct);
@@ -44,17 +47,20 @@ public interface IDistributorsApiClient
 {
     Task<DistributorDto?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<DistributorDto>> GetAllAsync(CancellationToken ct);
+    Task<PagedResult<DistributorDto>> GetPagedAsync(int? page_parameter, int? pageSize_parameter, CancellationToken ct);
     Task<DistributorApiResult> CreateAsync(DistributorCreateDto dto, CancellationToken ct);
     Task<DistributorApiResult> UpdateAsync(Guid id, DistributorUpdateDto dto, CancellationToken ct);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct);
 }
 
+// Resultado paginado genérico
+public record PagedResult<T>(List<T> Items, int Page, int PageSize, int TotalItems, int TotalPages);
+
+// ===== DTOs =====
 public record UserDto(Guid Id, string Username, string? Email);
 public record UserFullDto(Guid Id, string Username, string? Email, string? FirstName, string? MiddleName, string? LastName, bool MustChangePassword, List<string> Roles, string PasswordHash);
 public record ClientDto(Guid Id, string FirstName, string LastName, string? Email, string? Phone, string? Address);
 public record DistributorDto(Guid Id, string Name, string? ContactEmail, string? Phone, string? Address);
-
-// ===== Productos / Categorías DTOs =====
 public record CategoryDto(Guid Id, string Name);
 public record ProductDto(Guid Id, string Name, string? Description, Guid CategoryId, string? CategoryName, decimal Price, int Stock);
 
@@ -75,15 +81,8 @@ public class ProductCreateDto
     [Range(0, int.MaxValue, ErrorMessage = "El stock no puede ser negativo."), Display(Name = "Stock")]
     public int Stock { get; set; }
 }
-
 public class ProductUpdateDto : ProductCreateDto { }
-
-public class ProductApiResult
-{
-    public bool Success { get; set; }
-    public ProductDto? Product { get; set; }
-    public Dictionary<string, List<string>> Errors { get; set; } = new();
-}
+public class ProductApiResult { public bool Success { get; set; } public ProductDto? Product { get; set; } public Dictionary<string, List<string>> Errors { get; set; } = new(); }
 
 public class AuthLoginRequest { [Required] public string UserOrEmail { get; set; } = string.Empty; [Required] public string Password { get; set; } = string.Empty; }
 public class AuthLoginResult
@@ -100,7 +99,6 @@ public class AuthLoginResult
     public bool MustChangePassword { get; set; }
     public List<string> Roles { get; set; } = new();
 }
-
 public class ChangePasswordRequest
 {
     [Required(ErrorMessage = "La contraseña actual es obligatoria.")]
@@ -110,18 +108,8 @@ public class ChangePasswordRequest
     [Required, Compare(nameof(NewPassword), ErrorMessage = "Las contraseñas no coinciden.")]
     public string ConfirmPassword { get; set; } = string.Empty;
 }
-
-public class ApiSimpleResult
-{
-    public bool Success { get; set; }
-    public string? Error { get; set; }
-}
-
-public class UserCreateRequest
-{
-    [Required(ErrorMessage="El correo es obligatorio."), EmailAddress(ErrorMessage="Correo inválido.")] public string Email { get; set; } = string.Empty;
-    [Required(ErrorMessage="El rol es obligatorio.")] public string Role { get; set; } = string.Empty;
-}
+public class ApiSimpleResult { public bool Success { get; set; } public string? Error { get; set; } }
+public class UserCreateRequest { [Required(ErrorMessage="El correo es obligatorio."), EmailAddress(ErrorMessage="Correo inválido.")] public string Email { get; set; } = string.Empty; [Required(ErrorMessage="El rol es obligatorio.")] public string Role { get; set; } = string.Empty; }
 public class UserUpdateRequest { [Required, EmailAddress] public string Email { get; set; } = string.Empty; public List<string> Roles { get; set; } = new(); }
 public class UserApiResult { public bool Success { get; set; } public UserFullDto? User { get; set; } public Dictionary<string, List<string>> Errors { get; set; } = new(); }
 

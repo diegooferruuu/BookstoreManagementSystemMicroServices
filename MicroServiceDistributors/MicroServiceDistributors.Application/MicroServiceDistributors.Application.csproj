@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MicroServiceDistributors.Domain\MicroServiceDistributors.Domain.csproj" />
+    <ProjectReference Include="..\MicroServiceDistributors.Infraestructure\MicroServiceDistributors.Infraestructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -2,8 +2,6 @@ using MicroServiceDistributors.Application.Services;
 using MicroServiceDistributors.Domain.Interfaces;
 using MicroServiceDistributors.Infraestructure.DataBase;
 using MicroServiceUsers.Domain.Interfaces;
-using MicroservicioCliente.Infrastucture.Persistence;
-using MySql.Data.MySqlClient;
 using ServiceDistributors.Infrastructure.Repositories;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

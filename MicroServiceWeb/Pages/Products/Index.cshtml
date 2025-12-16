@@ -2,21 +2,44 @@
 @model LibraryWeb.Pages.Products.IndexModel
 @{
     ViewData["Title"] = "Productos";
+    int startNumber = (Model.Page - 1) * Model.PageSize;
 }
 
 <div class="card shadow-custom">
-    <div class="card-header card-header-blue d-flex align-items-center justify-content-between">
-        <h5 class="mb-0"><i class="fas fa-box me-2"></i>Productos</h5>
-        @if (User.IsInRole("Admin"))
-        {
-            <a asp-page="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Añadir Producto</a>
-        }
+    <div class="card-header card-header-blue d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h5 class="mb-0 text-white"><i class="fas fa-box me-2 text-white"></i>Productos</h5>
+        <div class="d-flex align-items-center gap-2">
+            <form method="get" class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 small text-white">Mostrar</label>
+                <div class="dropdown">
+                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-width: 70px;">
+                        @Model.PageSize
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        @foreach (var size in new[] { 10, 20, 50, 100 })
+                        {
+                            <li>
+                                <button type="submit" name="pageSize" value="@size" class="dropdown-item @(Model.PageSize == size ? "active" : "")">
+                                    @size registros
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                <input type="hidden" name="pageNumber" value="1" />
+            </form>
+            @if (User.IsInRole("Admin"))
+            {
+                <a asp-page="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Añadir Producto</a>
+            }
+        </div>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
                     <tr>
+                        <th class="th-blue">N°</th>
                         <th class="th-blue">Nombre</th>
                         <th class="th-blue">Descripción</th>
                         <th class="th-blue">Categoría</th>
@@ -24,28 +47,34 @@
                         <th class="th-blue">Inventario</th>
                         @if (User.IsInRole("Admin"))
                         {
-                            <th class="th-blue">Acciones</th>
+                            <th class="th-blue text-center">Acciones</th>
                         }
                     </tr>
                 </thead>
                 <tbody>
+                    @{
+                        int i = 0;
+                    }
                     @foreach (var product in Model.Products)
                     {
                         <tr>
+                            <td>@(startNumber + (++i))</td>
                             <td>@product.Name</td>
                             <td>@product.Description</td>
                             <td>@product.CategoryName</td>
-                            <td>@($"{product.Price:N2} Bs.")</td>
+                            <td>@product.Price.ToString("C")</td>
                             <td>@product.Stock</td>
                             @if (User.IsInRole("Admin"))
                             {
-                                <td>
+                                <td class="text-center table-actions">
                                     <form method="post" asp-page-handler="Edit" asp-antiforgery="true" class="d-inline">
                                         <input type="hidden" name="id" value="@product.Id" />
-                                        <button type="submit" class="btn btn-warning btn-sm" title="Editar"><i class="fas fa-edit"></i></button>
+                                        <input type="hidden" name="pageNumber" value="@Model.Page" />
+                                        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                                        <button type="submit" class="btn btn-warning btn-sm btn-icon"><i class="fas fa-edit"></i> Editar</button>
                                     </form>
-                                    <button type="button" class="btn btn-danger btn-sm ms-1" title="Eliminar" data-bs-toggle="modal" data-bs-target="#confirmDeleteProductModal" data-product-id="@product.Id">
-                                        <i class="fas fa-trash"></i>
+                                    <button type="button" class="btn btn-danger btn-sm btn-icon" data-bs-toggle="modal" data-bs-target="#confirmDeleteProductModal" data-product-id="@product.Id">
+                                        <i class="fas fa-trash"></i> Eliminar
                                     </button>
                                 </td>
                             }
@@ -58,6 +87,56 @@
         @if (!Model.Products.Any())
         {
             <div class="alert alert-info mb-0">No tienes productos registrados.</div>
+        }
+
+        <!-- Paginación -->
+        @if (Model.TotalPages > 1)
+        {
+            <nav class="d-flex justify-content-between align-items-center mt-3">
+                <div class="text-muted small">
+                    Página @Model.Page de @Model.TotalPages
+                </div>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                        <a class="page-link rounded-start-pill" asp-page="Index" asp-route-pageNumber="1" asp-route-pageSize="@Model.PageSize" title="Primera">
+                            <i class="fas fa-angles-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                        <a class="page-link" asp-page="Index" asp-route-pageNumber="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize" title="Anterior">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                    @{
+                        int start = Math.Max(1, Model.Page - 2);
+                        int end = Math.Min(Model.TotalPages, Model.Page + 2);
+                        if (start > 1)
+                        {
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        }
+                    }
+                    @for (int p = start; p <= end; p++)
+                    {
+                        <li class="page-item @(p == Model.Page ? "active" : "")">
+                            <a class="page-link" asp-page="Index" asp-route-pageNumber="@p" asp-route-pageSize="@Model.PageSize">@p</a>
+                        </li>
+                    }
+                    @if (end < Model.TotalPages)
+                    {
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    }
+                    <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                        <a class="page-link" asp-page="Index" asp-route-pageNumber="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize" title="Siguiente">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                        <a class="page-link rounded-end-pill" asp-page="Index" asp-route-pageNumber="@Model.TotalPages" asp-route-pageSize="@Model.PageSize" title="Última">
+                            <i class="fas fa-angles-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
         }
     </div>
 </div>
@@ -73,6 +152,8 @@
                 <div class="modal-body">
                     ¿Estás seguro de que deseas eliminar este producto?
                     <input type="hidden" id="deleteProductId" name="id" />
+                    <input type="hidden" name="page" value="@Model.Page" />
+                    <input type="hidden" name="pageSize" value="@Model.PageSize" />
                 </div>
                 <div class="modal-footer">
                     <button type="submit" class="btn btn-danger">Sí, eliminar</button>

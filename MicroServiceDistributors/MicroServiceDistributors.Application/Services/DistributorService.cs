@@ -1,6 +1,8 @@
 ﻿using MicroServiceDistributors.Domain.Interfaces;
 using MicroServiceDistributors.Domain.Models;
 using MicroServiceDistributors.Domain.Validations;
+using MicroServiceDistributors.Infraestructure.DataBase;
+using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -19,7 +21,13 @@ namespace MicroServiceDistributors.Application.Services
             _repository = repository;
         }
 
+        public Task<PagedResult<Distributor>> GetPagedAsync(int page, int pageSize, CancellationToken ct)
+        {
+            return _repository.GetPageAsync(page,pageSize, ct);
+        }
+
         public List<Distributor> GetAll() => _repository.GetAll();
+        
         public Distributor? Read(Guid id) => _repository.Read(id);
 
         public void Create(Distributor distributor)

@@ -28,6 +28,18 @@ namespace MicroServiceUsers.Controllers
             return Ok(list);
         }
 
+        // GET: api/user/paged?page=1&pageSize=10
+        [HttpGet("paged")]
+        [ProducesResponseType(typeof(PagedResult<User>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<PagedResult<User>>> GetPaged(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            CancellationToken ct = default)
+        {
+            var result = await _service.GetPagedAsync(page, pageSize, ct);
+            return Ok(result);
+        }
+
         // GET: api/user/{id}
         [HttpGet("{id:guid}")]
         public async Task<ActionResult<User>> GetById(Guid id, CancellationToken ct)
