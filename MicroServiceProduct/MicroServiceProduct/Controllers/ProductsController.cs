@@ -1,4 +1,5 @@
 // New file: ProductsController
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MicroServiceProduct.Application.Services;
 using MicroServiceProduct.Domain.Models;
@@ -10,6 +11,7 @@ namespace MicroServiceProduct.Controllers;
 
 [ApiController]
 [Route("api/products")]
+[Authorize]
 public class ProductsController : ControllerBase
 {
     private readonly IProductService _svc;
