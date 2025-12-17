@@ -24,13 +24,18 @@ namespace MicroServiceProduct.Infraestructure.Repository
         {
             using var conn = _database.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"INSERT INTO products (name, description, category_id, price, stock) VALUES (@name, @description, @category_id, @price, @stock)";
+            cmd.CommandText = @"INSERT INTO products (id, name, description, category_id, category_name, price, stock, created_at, is_active)
+                                VALUES (@id, @name, @description, @category_id,
+                                        (SELECT name FROM categories WHERE id = @category_id),
+                                        @price, @stock, @created_at, TRUE)";
 
+            var pId = cmd.CreateParameter(); pId.ParameterName = "@id"; pId.Value = product.Id; cmd.Parameters.Add(pId);
             var pName = cmd.CreateParameter(); pName.ParameterName = "@name"; pName.Value = product.Name; cmd.Parameters.Add(pName);
             var pDesc = cmd.CreateParameter(); pDesc.ParameterName = "@description"; pDesc.Value = (object?)product.Description ?? DBNull.Value; cmd.Parameters.Add(pDesc);
             var pCat = cmd.CreateParameter(); pCat.ParameterName = "@category_id"; pCat.Value = product.CategoryId != Guid.Empty ? (object)product.CategoryId : DBNull.Value; cmd.Parameters.Add(pCat);
             var pPrice = cmd.CreateParameter(); pPrice.ParameterName = "@price"; pPrice.Value = product.Price; cmd.Parameters.Add(pPrice);
             var pStock = cmd.CreateParameter(); pStock.ParameterName = "@stock"; pStock.Value = product.Stock; cmd.Parameters.Add(pStock);
+            var pCreated = cmd.CreateParameter(); pCreated.ParameterName = "@created_at"; pCreated.Value = product.CreatedAt == default ? DateTime.UtcNow : product.CreatedAt; cmd.Parameters.Add(pCreated);
 
             cmd.ExecuteNonQuery();
         }
@@ -39,7 +44,12 @@ namespace MicroServiceProduct.Infraestructure.Repository
         {
             using var conn = _database.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = @id";
+            cmd.CommandText = @"SELECT p.id, p.name, p.description, p.category_id,
+                                       COALESCE(c.name, p.category_name) AS category_name,
+                                       p.price, p.stock, p.created_at
+                                FROM products p
+                                LEFT JOIN categories c ON p.category_id = c.id
+                                WHERE p.id = @id";
             var pid = cmd.CreateParameter(); pid.ParameterName = "@id"; pid.Value = id; cmd.Parameters.Add(pid);
 
             using var reader = cmd.ExecuteReader();
@@ -65,12 +75,21 @@ namespace MicroServiceProduct.Infraestructure.Repository
         {
             using var conn = _database.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"UPDATE products SET name = @name, description = @description, category_id = @category_id, price = @price, stock = @stock WHERE id = @id";
+            cmd.CommandText = @"UPDATE products p
+                                SET name = @name,
+                                    description = @description,
+                                    category_id = @category_id,
+                                    category_name = COALESCE(c.name, @category_name, p.category_name),
+                                    price = @price,
+                                    stock = @stock
+                                FROM categories c
+                                WHERE p.id = @id AND c.id = @category_id";
 
             var pId = cmd.CreateParameter(); pId.ParameterName = "@id"; pId.Value = product.Id; cmd.Parameters.Add(pId);
             var pName = cmd.CreateParameter(); pName.ParameterName = "@name"; pName.Value = product.Name; cmd.Parameters.Add(pName);
             var pDesc = cmd.CreateParameter(); pDesc.ParameterName = "@description"; pDesc.Value = (object?)product.Description ?? DBNull.Value; cmd.Parameters.Add(pDesc);
             var pCat = cmd.CreateParameter(); pCat.ParameterName = "@category_id"; pCat.Value = product.CategoryId != Guid.Empty ? (object)product.CategoryId : DBNull.Value; cmd.Parameters.Add(pCat);
+            var pCatName = cmd.CreateParameter(); pCatName.ParameterName = "@category_name"; pCatName.Value = (object?)product.CategoryName ?? DBNull.Value; cmd.Parameters.Add(pCatName);
             var pPrice = cmd.CreateParameter(); pPrice.ParameterName = "@price"; pPrice.Value = product.Price; cmd.Parameters.Add(pPrice);
             var pStock = cmd.CreateParameter(); pStock.ParameterName = "@stock"; pStock.Value = product.Stock; cmd.Parameters.Add(pStock);
 
@@ -91,7 +110,13 @@ namespace MicroServiceProduct.Infraestructure.Repository
             var products = new List<Product>();
             using var conn = _database.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.is_active = TRUE ORDER BY p.name";
+            cmd.CommandText = @"SELECT p.id, p.name, p.description, p.category_id,
+                                       COALESCE(c.name, p.category_name) AS category_name,
+                                       p.price, p.stock, p.created_at
+                                FROM products p
+                                LEFT JOIN categories c ON p.category_id = c.id
+                                WHERE p.is_active = TRUE
+                                ORDER BY p.name";
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -133,10 +158,11 @@ namespace MicroServiceProduct.Infraestructure.Repository
 
             await using var conn = (NpgsqlConnection)_database.GetConnection();
 
-
             var offset = (page - 1) * pageSize;
-            var sql = @"SELECT p.*, c.name AS category_name 
-                        FROM products p 
+            var sql = @"SELECT p.id, p.name, p.description, p.category_id,
+                               COALESCE(c.name, p.category_name) AS category_name,
+                               p.price, p.stock, p.created_at
+                        FROM products p
                         LEFT JOIN categories c ON p.category_id = c.id
                         WHERE p.is_active = TRUE
                         ORDER BY p.name
@@ -165,7 +191,5 @@ namespace MicroServiceProduct.Infraestructure.Repository
             result.Items = items;
             return result;
         }
-
-        
     }
 }

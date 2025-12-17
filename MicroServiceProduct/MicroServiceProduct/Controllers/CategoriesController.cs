@@ -1,4 +1,5 @@
 // New file: CategoriesController
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MicroServiceProduct.Domain.Interfaces;
 using MicroServiceProduct.Domain.Models;
@@ -10,6 +11,7 @@ namespace MicroServiceProduct.Controllers;
 
 [ApiController]
 [Route("api/categories")]
+[Authorize]
 public class CategoriesController : ControllerBase
 {
     private readonly ICategoryRepository _repo;
@@ -20,7 +22,7 @@ public class CategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Obtiene todas las categorías.
+    /// Obtiene todas las categorías activas.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<Category>), StatusCodes.Status200OK)]
@@ -33,7 +35,7 @@ public class CategoriesController : ControllerBase
     /// <summary>
     /// Obtiene una categoría por su id.
     /// </summary>
-    [HttpGet("{id}")]
+    [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(Category), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<Category> Get(Guid id)
@@ -62,7 +64,7 @@ public class CategoriesController : ControllerBase
     /// <summary>
     /// Actualiza una categoría existente.
     /// </summary>
-    [HttpPut("{id}")]
+    [HttpPut("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -78,9 +80,9 @@ public class CategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Elimina una categoría por su id.
+    /// Elimina una categoría por su id (soft delete).
     /// </summary>
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult Delete(Guid id)

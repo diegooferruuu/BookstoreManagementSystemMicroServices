@@ -2,6 +2,7 @@ using MicroServiceWeb.External.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Threading;
+using System.Linq;
 
 namespace LibraryWeb.Pages.Distributors
 {
@@ -12,6 +13,11 @@ namespace LibraryWeb.Pages.Distributors
         public CreateModel(IDistributorsApiClient api) { _api = api; }
         public async Task<IActionResult> OnPostAsync(CancellationToken ct)
         {
+            Distributor.Name = Distributor.Name?.Trim() ?? string.Empty;
+            Distributor.ContactEmail = Distributor.ContactEmail?.Trim();
+            Distributor.Phone = Distributor.Phone?.Trim();
+            Distributor.Address = Distributor.Address?.Trim();
+
             if (!ModelState.IsValid) return Page();
             var result = await _api.CreateAsync(Distributor, ct);
             if (!result.Success)
