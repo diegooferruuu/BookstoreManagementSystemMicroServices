@@ -3,6 +3,7 @@ using MicroServiceReports.Infraestructure.Persistence;
 using MicroServiceReports.Infraestructure.Rabbit;
 using MicroServiceReports.Domain.Ports;
 using MicroServiceReports.Application.UseCases;
+using MicroServiceReports.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,8 +26,12 @@ builder.Services.AddDbContext<MicroServiceReportsDbContext>(options =>
 // Register repository
 builder.Services.AddScoped<ISaleEventRepository, SaleEventRepositoryEf>();
 
+// Register PDF generator service
+builder.Services.AddScoped<SalePdfGenerator>();
+
 // Register application handlers
 builder.Services.AddScoped<GetSaleBySaleIdHandler>();
+builder.Services.AddScoped<GenerateSalePdfHandler>();
 
 // Register background service to consume RabbitMQ
 builder.Services.AddHostedService<SalesConfirmedBackgroundService>();
@@ -80,6 +85,25 @@ app.MapGet("/api/reports/sale/{saleId:long}", async (long saleId, GetSaleBySaleI
 })
 .WithName("GetSaleBySaleId")
 .WithOpenApi();
+
+// Endpoint para generar y visualizar PDF del comprobante de venta
+app.MapGet("/api/reports/sale/{saleId:long}/pdf", async (long saleId, GenerateSalePdfHandler handler, HttpContext context) =>
+{
+    var pdfBytes = await handler.HandleAsync(saleId);
+    
+    if (pdfBytes == null)
+    {
+        return Results.NotFound(new { message = $"No se encontró reporte para la venta {saleId}" });
+    }
+
+    // inline = abre en el navegador, attachment = descarga
+    context.Response.Headers["Content-Disposition"] = $"inline; filename=comprobante_venta_{saleId}.pdf";
+    return Results.File(pdfBytes, "application/pdf");
+})
+.WithName("GetSalePdf")
+.WithOpenApi()
+.Produces<byte[]>(StatusCodes.Status200OK, "application/pdf")
+.Produces(StatusCodes.Status404NotFound);
 
 // Endpoint de salud
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "MicroServiceReports" }))
