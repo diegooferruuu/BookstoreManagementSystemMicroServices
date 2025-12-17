@@ -25,8 +25,19 @@ namespace LibraryWeb.Pages.Clients
             if (!result.Success)
             {
                 foreach (var kv in result.Errors)
+                {
+                    var key = kv.Key switch
+                    {
+                        "firstName" => "Client.FirstName",
+                        "lastName" => "Client.LastName",
+                        "email" => "Client.Email",
+                        "phone" => "Client.Phone",
+                        "address" => "Client.Address",
+                        _ => $"Client.{kv.Key}"
+                    };
                     foreach (var msg in kv.Value)
-                        ModelState.AddModelError($"Client.{kv.Key}", msg);
+                        ModelState.AddModelError(key, msg);
+                }
                 if (!result.Errors.Any()) ModelState.AddModelError(string.Empty, "Error desconocido al crear cliente.");
                 return Page();
             }

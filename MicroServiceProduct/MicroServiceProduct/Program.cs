@@ -1,5 +1,7 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using MicroServiceProduct.Infraestructure.DataBase;
 using MicroServiceProduct.Infraestructure.Repository;
@@ -50,9 +52,20 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Register controllers so attribute-routed controllers are available
-builder.Services.AddControllers();
-builder.Services.AddAuthorization();
+// Controllers con JSON camelCase explícito
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+});
+
+// Autorización global: requiere usuario autenticado por defecto
+builder.Services.AddAuthorization(o =>
+{
+    o.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 // Get connection string from configuration (appsettings.json)
 var connectionString = builder.Configuration.GetConnectionString("MicroServiceProduct")
@@ -106,28 +119,34 @@ builder.Services
             ValidIssuer = issuer,
             ValidAudience = audience,
             IssuerSigningKey = signingKey,
+            // Si el emisor envía aud como array, esta validación lo soporta explícitamente
+            AudienceValidator = (audiences, securityToken, validationParameters) =>
+            {
+                if (audiences is null) return false;
+                foreach (var aud in audiences)
+                {
+                    if (string.Equals(aud, audience, StringComparison.Ordinal))
+                        return true;
+                }
+                return false;
+            },
             ClockSkew = TimeSpan.Zero
         };
 
-        // Diagnóstico de errores de validación
+        // Diagnóstico de por qué falla la autenticación
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
             {
-                context.Response.Headers.Add("x-auth-error", context.Exception.GetType().Name);
+                context.Response.Headers["x-auth-error"] = context.Exception.GetType().Name;
                 return Task.CompletedTask;
             },
             OnChallenge = context =>
             {
-                // Agregar detalle del error para depurar en Swagger
                 if (!string.IsNullOrEmpty(context.Error))
-                {
-                    context.Response.Headers.Add("www-authenticate-error", context.Error);
-                }
+                    context.Response.Headers["www-authenticate-error"] = context.Error;
                 if (!string.IsNullOrEmpty(context.ErrorDescription))
-                {
-                    context.Response.Headers.Add("www-authenticate-error-desc", context.ErrorDescription);
-                }
+                    context.Response.Headers["www-authenticate-error-desc"] = context.ErrorDescription;
                 return Task.CompletedTask;
             }
         };

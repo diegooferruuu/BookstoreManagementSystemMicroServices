@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Threading;
 using System.Collections.Generic;
 using System;
+using System.Text.Json.Serialization;
 
 namespace MicroServiceWeb.External.Http;
 
@@ -57,12 +58,49 @@ public interface IDistributorsApiClient
 public record PagedResult<T>(List<T> Items, int Page, int PageSize, int TotalItems, int TotalPages);
 
 // ===== DTOs =====
-public record UserDto(Guid Id, string Username, string? Email);
-public record UserFullDto(Guid Id, string Username, string? Email, string? FirstName, string? MiddleName, string? LastName, bool MustChangePassword, List<string> Roles, string PasswordHash);
-public record ClientDto(Guid Id, string FirstName, string LastName, string? Email, string? Phone, string? Address);
-public record DistributorDto(Guid Id, string Name, string? ContactEmail, string? Phone, string? Address);
-public record CategoryDto(Guid Id, string Name);
-public record ProductDto(Guid Id, string Name, string? Description, Guid CategoryId, string? CategoryName, decimal Price, int Stock);
+public record UserDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("email")] string? Email);
+
+public record UserFullDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("email")] string? Email,
+    [property: JsonPropertyName("firstName")] string? FirstName,
+    [property: JsonPropertyName("middleName")] string? MiddleName,
+    [property: JsonPropertyName("lastName")] string? LastName,
+    [property: JsonPropertyName("mustChangePassword")] bool MustChangePassword,
+    [property: JsonPropertyName("roles")] List<string> Roles,
+    [property: JsonPropertyName("passwordHash")] string PasswordHash);
+
+public record ClientDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("firstName")] string FirstName,
+    [property: JsonPropertyName("lastName")] string LastName,
+    [property: JsonPropertyName("email")] string? Email,
+    [property: JsonPropertyName("phone")] string? Phone,
+    [property: JsonPropertyName("address")] string? Address);
+
+public record DistributorDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("contactEmail")] string? ContactEmail,
+    [property: JsonPropertyName("phone")] string? Phone,
+    [property: JsonPropertyName("address")] string? Address);
+
+public record CategoryDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("name")] string Name);
+
+public record ProductDto(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("description")] string? Description,
+    [property: JsonPropertyName("categoryId")] Guid CategoryId,
+    [property: JsonPropertyName("categoryName")] string? CategoryName,
+    [property: JsonPropertyName("price")] decimal Price,
+    [property: JsonPropertyName("stock")] int Stock);
 
 public class ProductCreateDto
 {
@@ -74,6 +112,9 @@ public class ProductCreateDto
 
     [Required(ErrorMessage = "La categoría es obligatoria."), Display(Name = "Categoría")]
     public Guid? CategoryId { get; set; }
+
+    // Campo opcional para ayudar a backends que mantienen columna denormalizada category_name
+    public string? CategoryName { get; set; }
 
     [Range(0.01, 999999.99, ErrorMessage = "El precio debe ser mayor a 0."), Display(Name = "Precio")]
     public decimal Price { get; set; }
@@ -115,8 +156,8 @@ public class UserApiResult { public bool Success { get; set; } public UserFullDt
 
 public class ClientCreateDto
 {
-    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), Display(Name = "Nombre")] public string FirstName { get; set; } = string.Empty;
-    [Required(ErrorMessage = "El apellido es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), Display(Name = "Apellido")] public string LastName { get; set; } = string.Empty;
+    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), RegularExpression(@"^[A-Za-zÁÉÍÓÚÑáéíóúÜüñ' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Nombre")] public string FirstName { get; set; } = string.Empty;
+    [Required(ErrorMessage = "El apellido es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), RegularExpression(@"^[A-Za-zÁÉÍÓÚÑáéíóúÜüñ' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Apellido")] public string LastName { get; set; } = string.Empty;
     [Required(ErrorMessage = "El correo electrónico es obligatorio."), EmailAddress(ErrorMessage = "Correo inválido."), MaxLength(150, ErrorMessage = "Máximo 150 caracteres."), Display(Name = "Correo electrónico")] public string? Email { get; set; }
     [Required(ErrorMessage = "El teléfono es obligatorio."), RegularExpression(@"^\d{8}$", ErrorMessage = "Debe tener 8 dígitos."), Display(Name = "Teléfono")] public string? Phone { get; set; }
     [Required(ErrorMessage = "La dirección es obligatoria."), MinLength(5, ErrorMessage = "Mínimo 5 caracteres."), MaxLength(255, ErrorMessage = "Máximo 255 caracteres."), Display(Name = "Dirección")] public string? Address { get; set; }
@@ -126,7 +167,7 @@ public class ClientApiResult { public bool Success { get; set; } public ClientDt
 
 public class DistributorCreateDto
 {
-    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(120, ErrorMessage = "Máximo 120 caracteres."), Display(Name = "Nombre")] public string Name { get; set; } = string.Empty;
+    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(120, ErrorMessage = "Máximo 120 caracteres."), RegularExpression(@"^[A-Za-zÁÉÍÓÚÑáéíóúÜüñ' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Nombre")] public string Name { get; set; } = string.Empty;
     [Required(ErrorMessage = "El correo de contacto es obligatorio."), EmailAddress(ErrorMessage = "Correo inválido."), Display(Name = "Correo de contacto")] public string? ContactEmail { get; set; }
     [Required(ErrorMessage = "El teléfono es obligatorio."), RegularExpression(@"^\d{8}$", ErrorMessage = "Debe tener 8 dígitos."), Display(Name = "Teléfono")] public string? Phone { get; set; }
     [Required(ErrorMessage = "La dirección es obligatoria."), MinLength(5, ErrorMessage = "Mínimo 5 caracteres."), MaxLength(255, ErrorMessage = "Máximo 255 caracteres."), Display(Name = "Dirección")] public string? Address { get; set; }

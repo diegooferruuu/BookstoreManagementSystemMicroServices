@@ -5,6 +5,7 @@
 }
 <h2>Crear Cliente</h2>
 <form method="post" novalidate>
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
     <div class="mb-3">
         <label asp-for="Client.FirstName" class="form-label"></label>
         <input asp-for="Client.FirstName" class="form-control" />
@@ -22,7 +23,7 @@
     </div>
     <div class="mb-3">
         <label asp-for="Client.Phone" class="form-label"></label>
-        <input asp-for="Client.Phone" class="form-control" />
+        <input asp-for="Client.Phone" class="form-control" inputmode="numeric" pattern="\d{8}" maxlength="8" />
         <span class="text-danger" asp-validation-for="Client.Phone"></span>
     </div>
     <div class="mb-3">

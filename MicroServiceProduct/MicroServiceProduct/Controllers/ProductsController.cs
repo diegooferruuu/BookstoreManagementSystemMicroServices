@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using MicroServiceProduct.Application.Services;
 using MicroServiceProduct.Domain.Models;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using ServiceCommon.Domain.Models;
 using System;
 using System.Collections.Generic;
@@ -15,6 +14,7 @@ namespace MicroServiceProduct.Controllers
 {
     [ApiController]
     [Route("api/products")]
+    [Authorize]
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _svc;

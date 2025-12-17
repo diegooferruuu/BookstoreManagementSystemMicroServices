@@ -6,6 +6,7 @@ using ServiceDistributors.Infrastructure.Repositories;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,7 +27,7 @@ builder.Services.AddAuthentication(options =>
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 }).AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false; // permitir HTTP en dev
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -39,6 +40,13 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = signingKey,
         ClockSkew = TimeSpan.Zero
     };
+});
+
+builder.Services.AddAuthorization(o =>
+{
+    o.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
 });
 
 // Registro de dependencias
