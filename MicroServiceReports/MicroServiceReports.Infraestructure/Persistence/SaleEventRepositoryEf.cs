@@ -1,5 +1,6 @@
 namespace MicroServiceReports.Infraestructure.Persistence
 {
+    using System.Collections.Generic;
     using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
     using MicroServiceReports.Domain.Models;
@@ -23,6 +24,13 @@ namespace MicroServiceReports.Infraestructure.Persistence
         public async Task<SaleEventRecord?> GetBySaleIdAsync(long saleId)
         {
             return await _dbContext.SaleEventRecords.FirstOrDefaultAsync(x => x.SaleId == saleId);
+        }
+
+        public async Task<IEnumerable<SaleEventRecord>> GetAllAsync()
+        {
+            return await _dbContext.SaleEventRecords
+                .OrderByDescending(x => x.ReceivedAt)
+                .ToListAsync();
         }
     }
 }

@@ -30,8 +30,7 @@ namespace MicroServiceReports.Infraestructure.Rabbit
         private readonly ILogger<SalesConfirmedBackgroundService> _logger;
         private readonly RabbitSettings _settings;
         private readonly IServiceScopeFactory _scopeFactory;
-        // Use classic IModel (fully-qualified) to avoid EF Core's IModel conflict
-        private RabbitMQ.Client.IModel? _channel;
+        private RabbitMQ.Client.IChannel? _channel;
         private RabbitMQ.Client.IConnection? _connection;
 
         public SalesConfirmedBackgroundService(ILogger<SalesConfirmedBackgroundService> logger, IOptions<RabbitSettings> options, IServiceScopeFactory scopeFactory)
@@ -41,13 +40,12 @@ namespace MicroServiceReports.Infraestructure.Rabbit
             _scopeFactory = scopeFactory;
         }
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            ConnectAndStartConsumer(stoppingToken);
-            return Task.CompletedTask;
+            await ConnectAndStartConsumerAsync(stoppingToken);
         }
 
-        private void ConnectAndStartConsumer(CancellationToken stoppingToken)
+        private async Task ConnectAndStartConsumerAsync(CancellationToken stoppingToken)
         {
             var factory = new RabbitMQ.Client.ConnectionFactory()
             {
@@ -57,14 +55,13 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                 Password = _settings.Password,
             };
 
-            _connection = factory.CreateConnection();
-            // Classic API: CreateModel returns IModel
-            _channel = _connection.CreateModel();
+            _connection = await factory.CreateConnectionAsync();
+            _channel = await _connection.CreateChannelAsync();
 
             // Declare queue/bindings is optional if already created, but harmless.
-            _channel.ExchangeDeclare(_settings.Exchange, ExchangeType.Topic, durable: true);
-            _channel.QueueDeclare(_settings.Queue, durable: true, exclusive: false, autoDelete: false, arguments: null);
-            _channel.QueueBind(_settings.Queue, _settings.Exchange, _settings.RoutingKey);
+            await _channel.ExchangeDeclareAsync(_settings.Exchange, ExchangeType.Topic, durable: true);
+            await _channel.QueueDeclareAsync(_settings.Queue, durable: true, exclusive: false, autoDelete: false, arguments: null);
+            await _channel.QueueBindAsync(_settings.Queue, _settings.Exchange, _settings.RoutingKey);
 
             var consumer = new RabbitMQ.Client.Events.AsyncEventingBasicConsumer(_channel);
             // Subscribe to ReceivedAsync (async handler)
@@ -74,7 +71,7 @@ namespace MicroServiceReports.Infraestructure.Rabbit
             };
 
             // BasicConsume(queue, autoAck, consumer)
-            _channel.BasicConsume(_settings.Queue, false, consumer);
+            await _channel.BasicConsumeAsync(_settings.Queue, false, consumer);
 
             _logger.LogInformation("RabbitMQ consumer started on queue {Queue}", _settings.Queue);
         }
@@ -96,14 +93,14 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                 {
                     _logger.LogWarning("Received message without saleId, will nack and not requeue. DeliveryTag={DeliveryTag}", ea.DeliveryTag);
                     // Permanent bad message - reject without requeue (send to DLX if configured)
-                    _channel?.BasicNack(ea.DeliveryTag, false, false);
+                    if (_channel != null) await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
                     return;
                 }
             }
             catch (JsonException jex)
             {
                 _logger.LogError(jex, "Failed to parse incoming message JSON. DeliveryTag={DeliveryTag}", ea.DeliveryTag);
-                _channel?.BasicNack(ea.DeliveryTag, false, false);
+                if (_channel != null) await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
                 return;
             }
 
@@ -114,7 +111,7 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                 if (repo == null)
                 {
                     _logger.LogError("ISaleEventRepository not registered. DeliveryTag={DeliveryTag}", ea.DeliveryTag);
-                    _channel?.BasicNack(ea.DeliveryTag, false, true);
+                    if (_channel != null) await _channel.BasicNackAsync(ea.DeliveryTag, false, true);
                     return;
                 }
 
@@ -131,7 +128,7 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                 await repo.SaveAsync(record).ConfigureAwait(false);
 
                 // ACK only after successful save
-                _channel?.BasicAck(ea.DeliveryTag, false);
+                if (_channel != null) await _channel.BasicAckAsync(ea.DeliveryTag, false);
                 _logger.LogInformation("Message persisted and ACKed. SaleId={SaleId}, DeliveryTag={DeliveryTag}", saleId, ea.DeliveryTag);
             }
             catch (Exception ex)
@@ -140,7 +137,7 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                 // Transient error policy: NACK with requeue true to retry later
                 try
                 {
-                    _channel?.BasicNack(ea.DeliveryTag, false, true);
+                    if (_channel != null) await _channel.BasicNackAsync(ea.DeliveryTag, false, true);
                 }
                 catch (Exception nackEx)
                 {
@@ -160,21 +157,14 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                     {
                         try
                         {
-                            _channel.Close();
+                            _channel.CloseAsync().GetAwaiter().GetResult();
                         }
                         catch
                         {
                             // ignore close exceptions
                         }
 
-                        try
-                        {
-                            _channel.Dispose();
-                        }
-                        catch
-                        {
-                            // ignore
-                        }
+                        _channel.DisposeAsync().AsTask().GetAwaiter().GetResult();
                     }
                 }
                 catch (Exception cex)
@@ -188,21 +178,14 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                     {
                         try
                         {
-                            _connection.Close();
+                            _connection.CloseAsync().GetAwaiter().GetResult();
                         }
                         catch
                         {
                             // ignore
                         }
 
-                        try
-                        {
-                            _connection.Dispose();
-                        }
-                        catch
-                        {
-                            // ignore
-                        }
+                        _connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
                     }
                 }
                 catch (Exception conex)

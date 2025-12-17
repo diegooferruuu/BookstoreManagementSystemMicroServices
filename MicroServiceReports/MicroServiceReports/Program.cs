@@ -42,25 +42,48 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/api/sales/{saleId:long}", async (long saleId, GetSaleBySaleIdHandler handler) =>
+// Endpoint para obtener todos los reportes
+app.MapGet("/api/reports", async (ISaleEventRepository repo) =>
+{
+    var records = await repo.GetAllAsync();
+    return Results.Ok(records.Select(r => new
+    {
+        id = r.Id,
+        saleId = r.SaleId,
+        payload = System.Text.Json.JsonDocument.Parse(r.Payload),
+        exchange = r.Exchange,
+        routingKey = r.RoutingKey,
+        receivedAt = r.ReceivedAt
+    }));
+})
+.WithName("GetAllReports")
+.WithOpenApi();
+
+// Endpoint para obtener reporte por SaleId
+app.MapGet("/api/reports/sale/{saleId:long}", async (long saleId, GetSaleBySaleIdHandler handler) =>
 {
     var record = await handler.HandleAsync(saleId);
     if (record == null)
     {
-        return Results.NotFound();
+        return Results.NotFound(new { message = $"No se encontró reporte para la venta {saleId}" });
     }
 
     return Results.Ok(new
     {
         id = record.Id,
         saleId = record.SaleId,
-        payload = record.Payload,
+        payload = System.Text.Json.JsonDocument.Parse(record.Payload),
         exchange = record.Exchange,
         routingKey = record.RoutingKey,
         receivedAt = record.ReceivedAt
     });
 })
 .WithName("GetSaleBySaleId")
+.WithOpenApi();
+
+// Endpoint de salud
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "MicroServiceReports" }))
+.WithName("HealthCheck")
 .WithOpenApi();
 
 app.Run();

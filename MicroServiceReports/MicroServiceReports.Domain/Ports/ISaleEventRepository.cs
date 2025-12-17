@@ -1,5 +1,6 @@
 namespace MicroServiceReports.Domain.Ports
 {
+    using System.Collections.Generic;
     using System.Threading.Tasks;
     using MicroServiceReports.Domain.Models;
 
@@ -7,5 +8,6 @@ namespace MicroServiceReports.Domain.Ports
     {
         Task SaveAsync(SaleEventRecord record);
         Task<SaleEventRecord?> GetBySaleIdAsync(long saleId);
+        Task<IEnumerable<SaleEventRecord>> GetAllAsync();
     }
 }
