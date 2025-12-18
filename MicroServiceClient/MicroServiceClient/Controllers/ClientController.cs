@@ -38,6 +38,16 @@ namespace MicroServiceClient.Controllers
             return Ok(result);
         }
 
+        // GET: api/client/by-ci/{ci}
+        [HttpGet("by-ci/{ci}")]
+        public async Task<ActionResult<Client>> GetByCi([FromRoute] string ci, CancellationToken ct = default)
+        {
+            var normalized = TextRules.NormalizeCi(ci);
+            var client = await _service.GetByCiAsync(normalized, ct);
+            if (client is null) return NotFound();
+            return Ok(client);
+        }
+
         // GET: api/client/{id}
         [HttpGet("{id:guid}")]
         public ActionResult<Client> GetById(Guid id)

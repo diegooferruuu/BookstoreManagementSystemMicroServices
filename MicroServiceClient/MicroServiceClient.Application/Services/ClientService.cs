@@ -26,6 +26,12 @@ namespace MicroServiceClient.Application.Services
 
         public Client? Read(Guid id) => _repository.Read(id);
 
+        public Task<Client?> GetByCiAsync(string ci, CancellationToken ct = default)
+        {
+            var normalized = TextRules.NormalizeCi(ci);
+            return _repository.GetByCiAsync(normalized, ct);
+        }
+
         public void Create(Client client)
         {
             var errors = ClientValidation.Validate(client).ToList();

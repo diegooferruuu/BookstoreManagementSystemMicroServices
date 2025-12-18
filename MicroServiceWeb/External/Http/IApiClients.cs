@@ -38,6 +38,7 @@ public interface IUsersApiClient
 public interface IClientsApiClient
 {
     Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct);
+    Task<ClientDto?> GetByCiAsync(string ci, CancellationToken ct);
     Task<IReadOnlyList<ClientDto>> GetAllAsync(CancellationToken ct);
     Task<PagedResult<ClientDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct);
     Task<ClientApiResult> CreateAsync(ClientCreateDto dto, CancellationToken ct);

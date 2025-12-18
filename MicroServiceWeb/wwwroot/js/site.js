@@ -154,3 +154,53 @@
     });
 
 })(jQuery);
+
+// Autocompletar simple para ventas (opcional - funciona sin esto)
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        var input = document.getElementById('clientSearchInput');
+        var list = document.getElementById('clientSuggestions');
+        if (!input || !list) return;
+
+        var timer;
+        function clearList() { list.innerHTML = ''; }
+
+        function render(items) {
+            clearList();
+            if (!items || items.length === 0) return;
+            items.forEach(function(it) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'list-group-item list-group-item-action py-2';
+                btn.innerHTML = '<strong>' + it.ci + '</strong> - ' + it.name;
+                btn.addEventListener('click', function () {
+                    input.value = it.ci;
+                    clearList();
+                    // Enviar form para buscar/seleccionar
+                    var form = document.getElementById('mainSaleForm');
+                    if (form) {
+                        form.action = '?handler=SearchClient';
+                        form.submit();
+                    }
+                });
+                list.appendChild(btn);
+            });
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            var term = (input.value || '').trim();
+            if (term.length < 2) { clearList(); return; }
+            timer = setTimeout(function () {
+                fetch(window.location.pathname + '?handler=ClientSuggestions&term=' + encodeURIComponent(term))
+                    .then(function (r) { return r.ok ? r.json() : []; })
+                    .then(render)
+                    .catch(clearList);
+            }, 250);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (e.target !== input && !list.contains(e.target)) clearList();
+        });
+    });
+})();

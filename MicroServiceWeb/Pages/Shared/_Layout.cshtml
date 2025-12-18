@@ -79,15 +79,25 @@
                             </li>
 
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <a class="nav-link dropdown-toggle" id="distributorsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="fas fa-shopping-cart me-1"></i>Distribuidores
                                 </a>
-                                <ul class="dropdown-menu" aria-labelledby="salesDropdown">
+                                <ul class="dropdown-menu" aria-labelledby="distributorsDropdown">
                                     <li><a class="dropdown-item" href="/Distributors"><i class="fas fa-list me-2"></i>Todos Los Distribuidores</a></li>
                                     @if (User.IsInRole("Admin"))
                                     {
                                         <li><a class="dropdown-item" href="/Distributors/Create"><i class="fas fa-plus me-2"></i>Añadir Distribuidores</a></li>
                                     }
+                                </ul>
+                            </li>
+
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-cash-register me-1"></i>Ventas
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="salesDropdown">
+                                    <li><a class="dropdown-item" href="/Sales/Create"><i class="fas fa-plus me-2"></i>Registrar Venta</a></li>
+                                    <li><a class="dropdown-item" href="/Sales"><i class="fas fa-list me-2"></i>Listado de Ventas</a></li>
                                 </ul>
                             </li>
                         }

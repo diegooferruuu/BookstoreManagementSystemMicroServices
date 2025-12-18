@@ -12,6 +12,7 @@ namespace MicroServiceClient.Domain.Interfaces
         List<Client> GetAll();
         Task<PagedResult<Client>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default);
         Client? Read(Guid id);
+        Task<Client?> GetByCiAsync(string ci, CancellationToken ct = default);
         void Create(Client client);
         void Update(Client client);
         void Delete(Guid id);
