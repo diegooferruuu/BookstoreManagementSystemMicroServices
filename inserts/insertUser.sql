@@ -48,3 +48,10 @@ INSERT INTO public.user_roles (user_id, role_id) VALUES ('a6d922f3-6bd5-4fb3-8f5
 INSERT INTO public.user_roles (user_id, role_id) VALUES ('f1dd1b8d-1c54-4c5d-b69e-7e5a5f2d8d07'::uuid, 'ef3b9e6a-26a0-4c53-bf07-7e85a9c38c69'::uuid);
 INSERT INTO public.user_roles (user_id, role_id) VALUES ('a2a4b9b6-2dd7-4a45-a0f3-9f1a1d2b3c4d'::uuid, '7fb1de2f-1c2d-4d83-9e8f-1f2a3b4c5d6e'::uuid);
 INSERT INTO public.user_roles (user_id, role_id) VALUES ('3f7d9a1c-0f24-4c7a-8f6c-1b2c3d4e5f60'::uuid, '64c1b043-d2be-484b-8a42-7a10b86eddb9'::uuid);
+
+INSERT INTO public.roles
+(id, "name")
+VALUES(gen_random_uuid(), 'Employee');
+INSERT INTO public.roles
+(id, "name")
+VALUES(gen_random_uuid(), 'Admin');
