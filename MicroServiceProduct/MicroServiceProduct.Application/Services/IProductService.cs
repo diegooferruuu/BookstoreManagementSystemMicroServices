@@ -13,6 +13,7 @@ namespace MicroServiceProduct.Application.Services
         void Update(Product product);
         void Delete(Guid id);
         List<Product> GetAll();
+        bool TryReserveStock(Dictionary<Guid, int> items, out string? error);
 
         Task<PagedResult<Product>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default);
     }

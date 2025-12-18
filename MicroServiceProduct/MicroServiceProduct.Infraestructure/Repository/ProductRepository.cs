@@ -135,6 +135,65 @@ namespace MicroServiceProduct.Infraestructure.Repository
             }
             return products;
         }
+
+        public bool TryReserveStock(Dictionary<Guid, int> items, out string? error)
+        {
+            error = null;
+            using var conn = _database.GetConnection();
+            using var tx = conn.BeginTransaction();
+
+            try
+            {
+                foreach (var kv in items)
+                {
+                    var productId = kv.Key;
+                    var qty = kv.Value;
+
+                    using var check = conn.CreateCommand();
+                    check.Transaction = tx;
+                    check.CommandText = "SELECT stock FROM products WHERE id = @id FOR UPDATE";
+                    var pId = check.CreateParameter(); pId.ParameterName = "@id"; pId.Value = productId; check.Parameters.Add(pId);
+
+                    var result = check.ExecuteScalar();
+                    if (result == null || result == DBNull.Value)
+                    {
+                        error = $"Product {productId} not found";
+                        tx.Rollback();
+                        return false;
+                    }
+
+                    var currentStock = Convert.ToInt32(result);
+                    if (qty <= 0)
+                    {
+                        error = $"Invalid quantity {qty} for product {productId}";
+                        tx.Rollback();
+                        return false;
+                    }
+                    if (currentStock < qty)
+                    {
+                        error = $"Insufficient stock for product {productId}";
+                        tx.Rollback();
+                        return false;
+                    }
+
+                    using var update = conn.CreateCommand();
+                    update.Transaction = tx;
+                    update.CommandText = "UPDATE products SET stock = stock - @qty WHERE id = @id";
+                    var uId = update.CreateParameter(); uId.ParameterName = "@id"; uId.Value = productId; update.Parameters.Add(uId);
+                    var uQty = update.CreateParameter(); uQty.ParameterName = "@qty"; uQty.Value = qty; update.Parameters.Add(uQty);
+                    update.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                try { tx.Rollback(); } catch { }
+                error = ex.Message;
+                return false;
+            }
+        }
         public async Task<int> CountAsync(CancellationToken ct = default)
         {
             await using var conn = (NpgsqlConnection)_database.GetConnection();

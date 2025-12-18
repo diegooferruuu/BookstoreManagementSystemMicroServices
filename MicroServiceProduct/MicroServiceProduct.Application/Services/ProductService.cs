@@ -28,6 +28,8 @@ namespace MicroServiceProduct.Application.Services
 
         public List<Product> GetAll() => _repo.GetAll();
 
+        public bool TryReserveStock(Dictionary<Guid, int> items, out string? error)
+            => _repo.TryReserveStock(items, out error);
         Task<PagedResult<Product>> IProductService.GetPagedAsync(int page, int pageSize, CancellationToken ct)
         {
             return _repo.GetPagedAsync(page, pageSize, ct);

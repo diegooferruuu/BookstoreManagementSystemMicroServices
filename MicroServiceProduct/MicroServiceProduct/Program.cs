@@ -8,6 +8,7 @@ using MicroServiceProduct.Infraestructure.Repository;
 using MicroServiceProduct.Domain.Services;
 using MicroServiceProduct.Domain.Interfaces;
 using MicroServiceProduct.Application.Services;
+using MicroServiceProduct.Infraestructure.Messaging;
 using System.Reflection;
 using System.IO;
 
@@ -28,7 +29,7 @@ builder.Services.AddSwaggerGen(c =>
 
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
-        Description = "Autenticaci�n JWT usando el esquema Bearer. Ejemplo: Bearer {token}",
+        Description = "Autenticaciï¿½n JWT usando el esquema Bearer. Ejemplo: Bearer {token}",
         Name = "Authorization",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
@@ -52,14 +53,14 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Controllers con JSON camelCase expl�cito
+// Controllers con JSON camelCase explícito
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
 });
 
-// Autorizaci�n global: requiere usuario autenticado por defecto
+// Autorización global: requiere usuario autenticado por defecto
 builder.Services.AddAuthorization(o =>
 {
     o.FallbackPolicy = new AuthorizationPolicyBuilder()
@@ -88,7 +89,10 @@ builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 // Application services
 builder.Services.AddScoped<IProductService, ProductService>();
 
-// Configuraci�n JWT
+// Messaging
+builder.Services.AddSingleton<IEventPublisher, RabbitPublisher>();
+builder.Services.AddHostedService<RabbitConsumerForProduct>();
+// Configuraciï¿½n JWT
 var issuer = builder.Configuration["Jwt:Issuer"];
 var audience = builder.Configuration["Jwt:Audience"];
 var key = builder.Configuration["Jwt:Key"];
@@ -119,7 +123,7 @@ builder.Services
             ValidIssuer = issuer,
             ValidAudience = audience,
             IssuerSigningKey = signingKey,
-            // Si el emisor env�a aud como array, esta validaci�n lo soporta expl�citamente
+            // Si el emisor envía aud como array, esta validación lo soporta explícitamente
             AudienceValidator = (audiences, securityToken, validationParameters) =>
             {
                 if (audiences is null) return false;
@@ -133,7 +137,8 @@ builder.Services
             ClockSkew = TimeSpan.Zero
         };
 
-        // Diagn�stico de por qu� falla la autenticaci�n
+        // Diagnï¿½stico de errores de validaciï¿½n
+        // Diagnóstico de por qué falla la autenticación
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
