@@ -383,6 +383,17 @@ namespace MicroServiceWeb.External.Http
     public class ClientsApiClient : IClientsApiClient
     {
         private readonly HttpClient _http; public ClientsApiClient(IHttpClientFactory f)=>_http=f.CreateClient("ClientsService");
+
+        public async Task<ClientDto?> GetByCiAsync(string ci, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(ci)) return null;
+            var url = $"api/Client/by-ci/{Uri.EscapeDataString(ci)}";
+            var resp = await _http.GetAsync(url, ct);
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+            if (!resp.IsSuccessStatusCode) return null;
+            try { return await resp.Content.ReadFromJsonAsync<ClientDto>(cancellationToken: ct); } catch { return null; }
+        }
+
         public async Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct)
         {
             var resp = await _http.GetAsync($"api/Client/{id}", ct);

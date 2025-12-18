@@ -89,6 +89,8 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizePage("/Users/ChangePassword", "AdminOrEmployee");
     options.Conventions.AuthorizePage("/Index", "AdminOrEmployee");
     options.Conventions.AuthorizePage("/Error", "AdminOrEmployee");
+    options.Conventions.AuthorizeFolder("/Sales", "AdminOrEmployee");
+    options.Conventions.AuthorizePage("/Sales/Create", "AdminOrEmployee");
 })
 .AddMvcOptions(options =>
 {

@@ -231,6 +231,21 @@ namespace MicroServiceClient.Infrastructure.Repositories
             cmd.ExecuteNonQuery();
         }
 
+        public async Task<Client?> GetByCiAsync(string ci, CancellationToken ct = default)
+        {
+            await using var conn = (NpgsqlConnection)_database.GetConnection();
+            await using var cmd = new NpgsqlCommand("SELECT * FROM clients WHERE ci = @ci AND is_active = TRUE LIMIT 1", conn);
+            cmd.Parameters.AddWithValue("@ci", ci);
+
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (await reader.ReadAsync(ct))
+            {
+                return MapClient(reader);
+            }
+
+            return null;
+        }
+
         public bool ExistsByCi(string ci, Guid? excludeId = null)
         {
             using var conn = _database.GetConnection();
