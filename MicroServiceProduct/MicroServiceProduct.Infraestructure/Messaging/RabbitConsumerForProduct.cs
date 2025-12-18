@@ -40,14 +40,14 @@ namespace MicroServiceProduct.Infraestructure.Messaging
                 DispatchConsumersAsync = true
             };
 
-            _exchange = cfg["RabbitMQ:Exchange"] ?? "sales.events";
+            _exchange = cfg["RabbitMQ:Exchange"] ?? "saga.exchange";
 
             _conn = factory.CreateConnection();
             _channel = _conn.CreateModel();
             _channel.ExchangeDeclare(_exchange, ExchangeType.Topic, durable: true);
 
             _channel.QueueDeclare("products.queue", durable: true, exclusive: false, autoDelete: false);
-            _channel.QueueBind("products.queue", _exchange, "sales.created");
+            _channel.QueueBind("products.queue", _exchange, "sales.pending");
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -68,16 +68,26 @@ namespace MicroServiceProduct.Infraestructure.Messaging
                 var root = doc.RootElement;
 
                 Guid saleId = root.GetProperty("SaleId").GetGuid();
-                var itemsElem = root.GetProperty("Items");
+                Guid userId = root.GetProperty("UserId").GetGuid();
+                Guid clientId = root.GetProperty("ClientId").GetGuid();
+                decimal subtotal = root.GetProperty("Subtotal").GetDecimal();
+                decimal total = root.GetProperty("Total").GetDecimal();
+                DateTimeOffset saleDate = root.GetProperty("SaleDate").GetDateTimeOffset();
+                
+                var productsElem = root.GetProperty("Products");
                 var items = new Dictionary<Guid, int>();
-                foreach (var item in itemsElem.EnumerateArray())
+                var productsList = new List<object>();
+                
+                foreach (var product in productsElem.EnumerateArray())
                 {
-                    var pid = item.GetProperty("ProductId").GetGuid();
-                    var qty = item.GetProperty("Quantity").GetInt32();
+                    var pid = product.GetProperty("ProductId").GetGuid();
+                    var qty = product.GetProperty("Quantity").GetInt32();
+                    var price = product.GetProperty("UnitPrice").GetDecimal();
                     items[pid] = qty;
+                    productsList.Add(new { ProductId = pid, Quantity = qty, UnitPrice = price });
                 }
 
-                _log.LogInformation("Procesando sales.created: saleId={saleId} items={count}", saleId, items.Count);
+                _log.LogInformation("Procesando sales.pending: saleId={saleId} items={count}", saleId, items.Count);
 
                 using var scope = _scopeFactory.CreateScope();
                 var productService = scope.ServiceProvider.GetRequiredService<IProductService>();
@@ -85,17 +95,39 @@ namespace MicroServiceProduct.Infraestructure.Messaging
 
                 if (productService.TryReserveStock(items, out var error))
                 {
-                    await publisher.PublishAsync("sales.confirmed", new { SaleId = saleId, Status = "CONFIRMED" });
+                    _log.LogInformation("Stock reservado exitosamente para sale {saleId}", saleId);
+                    // Publicar sales.approved con todos los datos de la venta
+                    await publisher.PublishAsync("sales.approved", new 
+                    { 
+                        SaleId = saleId,
+                        UserId = userId,
+                        ClientId = clientId,
+                        Subtotal = subtotal,
+                        Total = total,
+                        SaleDate = saleDate,
+                        Status = "APPROVED",
+                        Products = productsList
+                    });
                 }
                 else
                 {
-                    _log.LogWarning("Stock reservation failed for sale {saleId}: {error}", saleId, error);
-                    await publisher.PublishAsync("sales.rejected", new { SaleId = saleId, Status = "REJECTED", Error = error });
+                    _log.LogWarning("Reserva de stock fallida para sale {saleId}: {error}", saleId, error);
+                    await publisher.PublishAsync("sales.approved", new 
+                    { 
+                        SaleId = saleId,
+                        UserId = userId,
+                        ClientId = clientId,
+                        Subtotal = subtotal,
+                        Total = total,
+                        SaleDate = saleDate,
+                        Status = "REJECTED", 
+                        Error = error 
+                    });
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, "Error procesando mensaje sales.created");
+                _log.LogError(ex, "Error procesando mensaje sales.pending");
             }
         }
 

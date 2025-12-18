@@ -40,7 +40,7 @@ namespace MicroServiceSales.Infrastructure.Messaging
             };
 
             // Exchange por defecto para eventos de ventas
-            _exchange = cfg["RabbitMQ:Exchange"] ?? "sales.events";
+            _exchange = cfg["RabbitMQ:Exchange"] ?? "saga.exchange";
 
             _conn = factory.CreateConnection();
             _channel = _conn.CreateModel();
@@ -48,8 +48,8 @@ namespace MicroServiceSales.Infrastructure.Messaging
 
             // Cola enfocada a procesos de ventas
             _channel.QueueDeclare("sales.queue", durable: true, exclusive: false, autoDelete: false);
-            // Escuchamos la confirmación de stock desde el microservicio de productos
-            _channel.QueueBind("sales.queue", _exchange, "sales.confirmed");
+            // Escuchamos la aprobación de stock desde el microservicio de productos
+            _channel.QueueBind("sales.queue", _exchange, "sales.approved");
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -72,31 +72,89 @@ namespace MicroServiceSales.Infrastructure.Messaging
                 var root = doc.RootElement;
 
                 Guid saleId = root.GetProperty("SaleId").GetGuid();
+                string status = root.GetProperty("Status").GetString() ?? "UNKNOWN";
 
-                _log.LogInformation("Procesando sales.confirmed: saleId={saleId}", saleId);
+                _log.LogInformation("Procesando sales.approved: saleId={saleId} status={status}", saleId, status);
 
                 using var scope = _scopeFactory.CreateScope();
-                var salesService = scope.ServiceProvider.GetRequiredService<SalesService>();
+                var salesRepo = scope.ServiceProvider.GetRequiredService<ISalesRepository>();
                 var publisher = scope.ServiceProvider.GetRequiredService<IEventPublisher>();
 
                 try
                 {
-                    var sale = salesService.Read(saleId);
-                    if (sale is null)
-                        throw new InvalidOperationException($"Sale {saleId} not found");
+                    if (status == "APPROVED")
+                    {
+                        // Reconstruir la venta desde el mensaje
+                        var sale = new MicroServiceSales.Domain.Models.Sale
+                        {
+                            Id = saleId,
+                            UserId = root.GetProperty("UserId").GetGuid(),
+                            ClientId = root.GetProperty("ClientId").GetGuid(),
+                            Subtotal = root.GetProperty("Subtotal").GetDecimal(),
+                            Total = root.GetProperty("Total").GetDecimal(),
+                            SaleDate = root.GetProperty("SaleDate").GetDateTimeOffset(),
+                            Status = "COMPLETED",
+                            CreatedAt = DateTimeOffset.UtcNow
+                        };
 
-                    // Confirmar la venta cambiando su estado a COMPLETED
-                    sale.Status = "COMPLETED";
-                    salesService.Update(sale);
+                        // Reconstruir detalles
+                        var details = new List<MicroServiceSales.Domain.Models.SaleDetail>();
+                        var productsElem = root.GetProperty("Products");
+                        foreach (var prod in productsElem.EnumerateArray())
+                        {
+                            var detail = new MicroServiceSales.Domain.Models.SaleDetail
+                            {
+                                Id = Guid.NewGuid(),
+                                SaleId = saleId,
+                                ProductId = prod.GetProperty("ProductId").GetGuid(),
+                                Quantity = prod.GetProperty("Quantity").GetInt32(),
+                                UnitPrice = prod.GetProperty("UnitPrice").GetDecimal(),
+                                Subtotal = prod.GetProperty("UnitPrice").GetDecimal() * prod.GetProperty("Quantity").GetInt32()
+                            };
+                            details.Add(detail);
+                        }
+
+                        // Guardar en DB
+                        salesRepo.Create(sale);
+                        salesRepo.CreateDetails(saleId, details);
+
+                        _log.LogInformation("Venta {saleId} guardada en DB con estado COMPLETED", saleId);
+
+                        // Publicar sales.confirmed para que otros microservicios puedan procesarla
+                        await publisher.PublishAsync("sales.confirmed", new
+                        {
+                            SaleId = saleId,
+                            UserId = sale.UserId,
+                            ClientId = sale.ClientId,
+                            Total = sale.Total,
+                            Status = "CONFIRMED",
+                            SaleDate = sale.SaleDate,
+                            Products = details.Select(d => new
+                            {
+                                ProductId = d.ProductId,
+                                Quantity = d.Quantity,
+                                UnitPrice = d.UnitPrice,
+                                Subtotal = d.Subtotal
+                            }).ToList()
+                        });
+
+                        _log.LogInformation("Evento sales.confirmed publicado para saleId={saleId}", saleId);
+                    }
+                    else if (status == "REJECTED")
+                    {
+                        string error = root.GetProperty("Error").GetString() ?? "Unknown error";
+                        _log.LogWarning("Venta {saleId} rechazada: {error}", saleId, error);
+                        // Aquí podrías notificar al cliente o tomar otra acción
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _log.LogError(ex, "Error confirmando la venta");
+                    _log.LogError(ex, "Error procesando aprobación de venta");
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, "Error procesando mensaje sales.confirmed");
+                _log.LogError(ex, "Error procesando mensaje sales.approved");
             }
         }
 

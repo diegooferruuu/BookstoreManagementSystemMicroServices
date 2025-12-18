@@ -22,7 +22,7 @@ namespace MicroServiceProduct.Infraestructure.Messaging
                 Password = cfg["RabbitMQ:Password"] ?? "guest",
                 DispatchConsumersAsync = true
             };
-            _exchange = cfg["RabbitMQ:Exchange"] ?? "sales.events";
+            _exchange = cfg["RabbitMQ:Exchange"] ?? "saga.exchange";
             _conn = factory.CreateConnection();
             _channel = _conn.CreateModel();
             _channel.ExchangeDeclare(_exchange, ExchangeType.Topic, durable: true);

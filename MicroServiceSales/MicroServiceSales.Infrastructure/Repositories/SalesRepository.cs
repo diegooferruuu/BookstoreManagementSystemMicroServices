@@ -77,11 +77,12 @@ namespace MicroServiceSales.Infrastructure.Repositories
             using var conn = _database.GetConnection();
             using var cmd = new NpgsqlCommand(@"
                 INSERT INTO sales (
-                    client_id, user_id, sale_date, subtotal, total, status, cancelled_at, cancelled_by
+                    id, client_id, user_id, sale_date, subtotal, total, status, cancelled_at, cancelled_by
                 ) VALUES (
-                    @client_id, @user_id, @sale_date, @subtotal, @total, @status, @cancelled_at, @cancelled_by
+                    @id, @client_id, @user_id, @sale_date, @subtotal, @total, @status, @cancelled_at, @cancelled_by
                 )", conn);
 
+            cmd.Parameters.AddWithValue("@id", NpgsqlDbType.Uuid, sale.Id);
             cmd.Parameters.AddWithValue("@client_id", NpgsqlDbType.Uuid, sale.ClientId);
             cmd.Parameters.AddWithValue("@user_id", NpgsqlDbType.Uuid, sale.UserId);
             cmd.Parameters.AddWithValue("@sale_date", NpgsqlDbType.TimestampTz, sale.SaleDate);

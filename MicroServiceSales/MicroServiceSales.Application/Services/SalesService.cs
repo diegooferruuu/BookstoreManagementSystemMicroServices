@@ -26,34 +26,43 @@ namespace MicroServiceSales.Application.Services
 
         public void Create(Sale sale)
         {
-            var errors = SalesValidation.ValidateAll(sale).ToList();
-            if (errors.Any())
-                throw new ValidationException(errors);
-
+            // Asegurar que la venta tenga un ID
+            if (sale.Id == Guid.Empty)
+                sale.Id = Guid.NewGuid();
+            
             // Orquestación: nueva venta se crea en estado PENDING
             sale.Status = "PENDING";
-            SalesValidation.Normalize(sale);
-            _repository.Create(sale);
-
-            // Persistir detalles si fueron enviados
+            
+            // Preparar los detalles ANTES de validar
             if (sale.Details != null && sale.Details.Any())
             {
                 foreach (var d in sale.Details)
                 {
-                    // Asegurar subtotal coherente si no se calculó
+                    // Asegurar IDs y subtotal coherente
+                    if (d.Id == Guid.Empty)
+                        d.Id = Guid.NewGuid();
+                    d.SaleId = sale.Id;
                     if (d.Subtotal == 0)
                         d.Subtotal = d.UnitPrice * d.Quantity;
                 }
-                _repository.CreateDetails(sale.Id, sale.Details);
             }
+            
+            // AHORA validamos con todos los datos completos
+            var errors = SalesValidation.ValidateAll(sale).ToList();
+            if (errors.Any())
+                throw new ValidationException(errors);
 
-            // Publicar evento a la saga de productos para disminuir stock
+            SalesValidation.Normalize(sale);
+            // NO guardamos en DB todavía, esperamos aprobación de productos
+
+            // Publicar evento a sales.pending para que productos verifique stock
             var evt = new
             {
                 MessageId = Guid.NewGuid().ToString(),
                 SaleId = sale.Id,
                 UserId = sale.UserId,
                 ClientId = sale.ClientId,
+                Subtotal = sale.Subtotal,
                 Total = sale.Total,
                 SaleDate = sale.SaleDate,
                 Products = (sale.Details ?? new List<SaleDetail>()).Select(d => new
@@ -63,8 +72,8 @@ namespace MicroServiceSales.Application.Services
                     UnitPrice = d.UnitPrice
                 }).ToList()
             };
-            // Convención: evento de creación de venta
-            _publisher.PublishAsync("sales.created", evt);
+            // Publicar a sales.pending para iniciar la saga
+            _publisher.PublishAsync("sales.pending", evt);
         }
 
         public void Update(Sale sale)
