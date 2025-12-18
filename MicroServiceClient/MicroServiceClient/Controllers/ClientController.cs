@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MicroServiceClient.Domain.Models;
 using MicroServiceClient.Domain.Interfaces;
 using MicroServiceClient.Domain.Validations;
@@ -6,6 +7,7 @@ using MicroServiceClient.Domain.Validations;
 namespace MicroServiceClient.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class ClientController : ControllerBase
     {
@@ -24,6 +26,18 @@ namespace MicroServiceClient.Controllers
             return Ok(list);
         }
 
+        // GET: api/client/paged?page=1&pageSize=10
+        [HttpGet("paged")]
+        [ProducesResponseType(typeof(PagedResult<Client>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<PagedResult<Client>>> GetPaged(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            CancellationToken ct = default)
+        {
+            var result = await _service.GetPagedAsync(page, pageSize, ct);
+            return Ok(result);
+        }
+
         // GET: api/client/{id}
         [HttpGet("{id:guid}")]
         public ActionResult<Client> GetById(Guid id)
@@ -40,8 +54,6 @@ namespace MicroServiceClient.Controllers
             try
             {
                 _service.Create(client);
-                // Si tu repositorio genera Id del lado BD, quizá no lo tengas aquí.
-                // Puedes devolver 200 con el objeto enviado o 201 sin Location.
                 return Ok(client);
             }
             catch (ValidationException ex)
@@ -85,4 +97,4 @@ namespace MicroServiceClient.Controllers
             return NoContent();
         }
     }
-    }
+}

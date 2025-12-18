@@ -2,6 +2,7 @@
 using Npgsql;
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -34,7 +35,7 @@ namespace MicroServiceDistributors.Infraestructure.DataBase
             return _instance;
         }
 
-        public NpgsqlConnection GetConnection()
+        public DbConnection GetConnection()
         {
             var conn = new NpgsqlConnection(_connectionString);
             conn.Open();

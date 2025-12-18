@@ -4,11 +4,13 @@ using MicroServiceUsers.Domain.Models;
 using MicroServiceUsers.Domain.Interfaces;
 using MicroServiceUsers.Domain.Validations;
 using System.Threading;
+using Microsoft.AspNetCore.Authorization;
 
 namespace MicroServiceUsers.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UserController : ControllerBase
     {
         private readonly IUserService _service;
@@ -24,6 +26,18 @@ namespace MicroServiceUsers.Controllers
         {
             var list = await _service.GetAllAsync(ct);
             return Ok(list);
+        }
+
+        // GET: api/user/paged?page=1&pageSize=10
+        [HttpGet("paged")]
+        [ProducesResponseType(typeof(PagedResult<User>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<PagedResult<User>>> GetPaged(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            CancellationToken ct = default)
+        {
+            var result = await _service.GetPagedAsync(page, pageSize, ct);
+            return Ok(result);
         }
 
         // GET: api/user/{id}

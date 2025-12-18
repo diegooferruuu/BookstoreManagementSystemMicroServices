@@ -10,6 +10,8 @@ namespace MicroServiceClient.Domain.Interfaces
     public interface IClientRepository
     {
         List<Client> GetAll();
+        Task<int> CountAsync(CancellationToken ct = default);
+        Task<PagedResult<Client>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default);
         Client? Read(Guid id);
         void Create(Client client);
         void Update(Client client);

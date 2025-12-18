@@ -436,7 +436,7 @@ main {
 /* ---------- Shared Blue Header ---------- */
 .card-header-blue {
     background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
-    color: #fff;
+    color: white !important;
 }
 
 .table thead th.th-blue {

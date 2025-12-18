@@ -11,6 +11,8 @@ namespace MicroServiceUsers.Domain.Interfaces
     public interface IUserRepository
     {
         Task<List<User>> GetAllAsync(CancellationToken ct = default);
+        Task<int> CountAsync(CancellationToken ct = default);
+        Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default);
         Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default);
         Task<User?> GetByUserOrEmailAsync(string userOrEmail, CancellationToken ct = default);
         Task<List<string>> GetRolesAsync(Guid userId, CancellationToken ct = default);

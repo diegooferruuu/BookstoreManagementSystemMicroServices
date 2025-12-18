@@ -9,6 +9,7 @@ namespace MicroServiceDistributors.Domain.Interfaces
 {
     public interface IDistributorService
     {
+        Task<PagedResult<Distributor>> GetPagedAsync(int page, int pageSize, CancellationToken ct);
         List<Distributor> GetAll();
         Distributor? Read(Guid id);
         void Create(Distributor distributor);

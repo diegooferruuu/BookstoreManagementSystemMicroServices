@@ -31,24 +31,18 @@ namespace MicroServiceUsers.Infrastructure.Repositories
                         LIMIT 1";
 
             await using var conn = _database.GetConnection();
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@ue", input);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            
+            var param = cmd.CreateParameter();
+            param.ParameterName = "@ue";
+            param.Value = input;
+            cmd.Parameters.Add(param);
 
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            await using var reader = await ((NpgsqlCommand)cmd).ExecuteReaderAsync(ct);
             if (await reader.ReadAsync(ct))
             {
-                return new User
-                {
-                    Id = reader.GetGuid(0),
-                    Username = reader.GetString(1),
-                    Email = reader.GetString(2),
-                    FirstName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                    LastName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                    MiddleName = reader.IsDBNull(5) ? null : reader.GetString(5),
-                    PasswordHash = reader.GetString(6),
-                    IsActive = reader.GetBoolean(7),
-                    MustChangePassword = reader.IsDBNull(8) ? false : reader.GetBoolean(8)
-                };
+                return MapUser(reader);
             }
             return null;
         }
@@ -62,10 +56,15 @@ namespace MicroServiceUsers.Infrastructure.Repositories
                         WHERE ur.user_id = @id";
 
             await using var conn = _database.GetConnection();
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@id", userId);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            
+            var param = cmd.CreateParameter();
+            param.ParameterName = "@id";
+            param.Value = userId;
+            cmd.Parameters.Add(param);
 
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            await using var reader = await ((NpgsqlCommand)cmd).ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
                 roles.Add(reader.GetString(0));
 
@@ -79,24 +78,18 @@ namespace MicroServiceUsers.Infrastructure.Repositories
                         FROM users WHERE id = @id";
 
             await using var conn = _database.GetConnection();
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@id", id);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            
+            var param = cmd.CreateParameter();
+            param.ParameterName = "@id";
+            param.Value = id;
+            cmd.Parameters.Add(param);
 
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            await using var reader = await ((NpgsqlCommand)cmd).ExecuteReaderAsync(ct);
             if (await reader.ReadAsync(ct))
             {
-                return new User
-                {
-                    Id = reader.GetGuid(0),
-                    Username = reader.GetString(1),
-                    Email = reader.GetString(2),
-                    FirstName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                    LastName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                    MiddleName = reader.IsDBNull(5) ? null : reader.GetString(5),
-                    PasswordHash = reader.GetString(6),
-                    IsActive = reader.GetBoolean(7),
-                    MustChangePassword = reader.IsDBNull(8) ? false : reader.GetBoolean(8)
-                };
+                return MapUser(reader);
             }
             return null;
         }
@@ -109,34 +102,75 @@ namespace MicroServiceUsers.Infrastructure.Repositories
                                password_hash, is_active, must_change_password 
                         FROM users 
                         WHERE is_active = TRUE 
-                        ORDER BY id";
+                        ORDER BY username";
 
             await using var conn = _database.GetConnection();
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            
+            await using var reader = await ((NpgsqlCommand)cmd).ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
-                users.Add(new User
-                {
-                    Id = reader.GetGuid(0),
-                    Username = reader.GetString(1),
-                    Email = reader.GetString(2),
-                    FirstName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                    LastName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                    MiddleName = reader.IsDBNull(5) ? null : reader.GetString(5),
-                    PasswordHash = reader.GetString(6),
-                    IsActive = reader.GetBoolean(7),
-                    MustChangePassword = reader.IsDBNull(8) ? false : reader.GetBoolean(8)
-                });
+                users.Add(MapUser(reader));
             }
 
             return users;
         }
 
+        public async Task<int> CountAsync(CancellationToken ct = default)
+        {
+            await using var conn = _database.GetConnection();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM users WHERE is_active = TRUE";
+            var count = await ((NpgsqlCommand)cmd).ExecuteScalarAsync(ct);
+            return Convert.ToInt32(count);
+        }
+
+        public async Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            var users = new List<User>();
+            int offset = (page - 1) * pageSize;
+
+            await using var conn = _database.GetConnection();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"SELECT id, username, email, first_name, last_name, middle_name, 
+                                       password_hash, is_active, must_change_password 
+                                FROM users 
+                                WHERE is_active = TRUE 
+                                ORDER BY username
+                                LIMIT @limit OFFSET @offset";
+
+            var paramLimit = cmd.CreateParameter();
+            paramLimit.ParameterName = "@limit";
+            paramLimit.Value = pageSize;
+            cmd.Parameters.Add(paramLimit);
+
+            var paramOffset = cmd.CreateParameter();
+            paramOffset.ParameterName = "@offset";
+            paramOffset.Value = offset;
+            cmd.Parameters.Add(paramOffset);
+
+            await using var reader = await ((NpgsqlCommand)cmd).ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                users.Add(MapUser(reader));
+            }
+
+            return new PagedResult<User>
+            {
+                Items = users,
+                Page = page,
+                PageSize = pageSize,
+                TotalItems = await CountAsync(ct)
+            };
+        }
+
         public async Task CreateAsync(User user, string password, List<string> roles, CancellationToken ct = default)
         {
-            // Hashear el password
             var hasher = new PasswordHasher<User>();
             user.PasswordHash = hasher.HashPassword(user, password);
 
@@ -148,31 +182,32 @@ namespace MicroServiceUsers.Infrastructure.Repositories
                          @passwordHash, @isActive, @mustChange)";
 
             await using var conn = _database.GetConnection();
-            await using var cmd = new NpgsqlCommand(sql, conn);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
 
             var newId = Guid.NewGuid();
             user.Id = newId;
 
-            cmd.Parameters.AddWithValue("@id", newId);
-            cmd.Parameters.AddWithValue("@username", user.Username);
-            cmd.Parameters.AddWithValue("@email", user.Email);
-            cmd.Parameters.AddWithValue("@firstName", user.FirstName ?? string.Empty);
-            cmd.Parameters.AddWithValue("@lastName", user.LastName ?? string.Empty);
-            cmd.Parameters.AddWithValue("@middleName", (object?)user.MiddleName ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@passwordHash", user.PasswordHash);
-            cmd.Parameters.AddWithValue("@isActive", user.IsActive);
-            cmd.Parameters.AddWithValue("@mustChange", user.MustChangePassword);
+            AddParameter(cmd, "@id", newId);
+            AddParameter(cmd, "@username", user.Username);
+            AddParameter(cmd, "@email", user.Email);
+            AddParameter(cmd, "@firstName", user.FirstName ?? string.Empty);
+            AddParameter(cmd, "@lastName", user.LastName ?? string.Empty);
+            AddParameter(cmd, "@middleName", (object?)user.MiddleName ?? DBNull.Value);
+            AddParameter(cmd, "@passwordHash", user.PasswordHash);
+            AddParameter(cmd, "@isActive", user.IsActive);
+            AddParameter(cmd, "@mustChange", user.MustChangePassword);
 
-            await cmd.ExecuteNonQueryAsync(ct);
+            await ((NpgsqlCommand)cmd).ExecuteNonQueryAsync(ct);
 
             foreach (var roleName in roles)
             {
-                var insertSql = @"INSERT INTO user_roles (user_id, role_id) 
-                                  SELECT @userId, r.id FROM roles r WHERE r.name = @roleName";
-                await using var roleCmd = new NpgsqlCommand(insertSql, conn);
-                roleCmd.Parameters.AddWithValue("@userId", newId);
-                roleCmd.Parameters.AddWithValue("@roleName", roleName);
-                await roleCmd.ExecuteNonQueryAsync(ct);
+                await using var roleCmd = conn.CreateCommand();
+                roleCmd.CommandText = @"INSERT INTO user_roles (user_id, role_id) 
+                                        SELECT @userId, r.id FROM roles r WHERE r.name = @roleName";
+                AddParameter(roleCmd, "@userId", newId);
+                AddParameter(roleCmd, "@roleName", roleName);
+                await ((NpgsqlCommand)roleCmd).ExecuteNonQueryAsync(ct);
             }
         }
 
@@ -190,62 +225,80 @@ namespace MicroServiceUsers.Infrastructure.Repositories
                         WHERE id = @id";
 
             await using var conn = _database.GetConnection();
-            await using var cmd = new NpgsqlCommand(sql, conn);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
 
-            cmd.Parameters.AddWithValue("@id", user.Id);
-            cmd.Parameters.AddWithValue("@username", user.Username);
-            cmd.Parameters.AddWithValue("@email", user.Email);
-            cmd.Parameters.AddWithValue("@firstName", user.FirstName ?? string.Empty);
-            cmd.Parameters.AddWithValue("@lastName", user.LastName ?? string.Empty);
-            cmd.Parameters.AddWithValue("@middleName", (object?)user.MiddleName ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@passwordHash", user.PasswordHash);
-            cmd.Parameters.AddWithValue("@isActive", user.IsActive);
-            cmd.Parameters.AddWithValue("@mustChange", user.MustChangePassword);
+            AddParameter(cmd, "@id", user.Id);
+            AddParameter(cmd, "@username", user.Username);
+            AddParameter(cmd, "@email", user.Email);
+            AddParameter(cmd, "@firstName", user.FirstName ?? string.Empty);
+            AddParameter(cmd, "@lastName", user.LastName ?? string.Empty);
+            AddParameter(cmd, "@middleName", (object?)user.MiddleName ?? DBNull.Value);
+            AddParameter(cmd, "@passwordHash", user.PasswordHash);
+            AddParameter(cmd, "@isActive", user.IsActive);
+            AddParameter(cmd, "@mustChange", user.MustChangePassword);
 
-            await cmd.ExecuteNonQueryAsync(ct);
+            await ((NpgsqlCommand)cmd).ExecuteNonQueryAsync(ct);
         }
 
         public async Task DeleteAsync(Guid id, CancellationToken ct = default)
         {
-            var sql = "UPDATE users SET is_active = FALSE WHERE id = @id";
-
             await using var conn = _database.GetConnection();
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@id", id);
-
-            await cmd.ExecuteNonQueryAsync(ct);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE users SET is_active = FALSE WHERE id = @id";
+            AddParameter(cmd, "@id", id);
+            await ((NpgsqlCommand)cmd).ExecuteNonQueryAsync(ct);
         }
 
         public async Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default)
         {
-            // Obtener el usuario
             var user = await GetByIdAsync(userId, ct);
             if (user is null || !user.IsActive)
                 return false;
 
-            // Verificar la contraseña actual
             var hasher = new PasswordHasher<User>();
             var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword);
             
             if (verify == PasswordVerificationResult.Failed)
                 return false;
 
-            // Hashear la nueva contraseña
             var newPasswordHash = hasher.HashPassword(user, newPassword);
 
-            // Actualizar la contraseña y cambiar MustChangePassword a false
-            var sql = @"UPDATE users 
-                        SET password_hash = @passwordHash, 
-                            must_change_password = FALSE
-                        WHERE id = @id";
-
             await using var conn = _database.GetConnection();
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@id", userId);
-            cmd.Parameters.AddWithValue("@passwordHash", newPasswordHash);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"UPDATE users 
+                                SET password_hash = @passwordHash, 
+                                    must_change_password = FALSE
+                                WHERE id = @id";
+            AddParameter(cmd, "@id", userId);
+            AddParameter(cmd, "@passwordHash", newPasswordHash);
 
-            var rowsAffected = await cmd.ExecuteNonQueryAsync(ct);
+            var rowsAffected = await ((NpgsqlCommand)cmd).ExecuteNonQueryAsync(ct);
             return rowsAffected > 0;
+        }
+
+        private static User MapUser(NpgsqlDataReader reader)
+        {
+            return new User
+            {
+                Id = reader.GetGuid(0),
+                Username = reader.GetString(1),
+                Email = reader.GetString(2),
+                FirstName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                LastName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                MiddleName = reader.IsDBNull(5) ? null : reader.GetString(5),
+                PasswordHash = reader.GetString(6),
+                IsActive = reader.GetBoolean(7),
+                MustChangePassword = reader.IsDBNull(8) ? false : reader.GetBoolean(8)
+            };
+        }
+
+        private static void AddParameter(System.Data.IDbCommand cmd, string name, object value)
+        {
+            var param = cmd.CreateParameter();
+            param.ParameterName = name;
+            param.Value = value;
+            cmd.Parameters.Add(param);
         }
     }
 }

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using MicroServiceProduct.Domain.Interfaces;
 using MicroServiceProduct.Domain.Models;
+using ServiceCommon.Domain.Models;
 
 namespace MicroServiceProduct.Application.Services
 {
@@ -29,5 +30,10 @@ namespace MicroServiceProduct.Application.Services
 
         public bool TryReserveStock(Dictionary<Guid, int> items, out string? error)
             => _repo.TryReserveStock(items, out error);
+        Task<PagedResult<Product>> IProductService.GetPagedAsync(int page, int pageSize, CancellationToken ct)
+        {
+            return _repo.GetPagedAsync(page, pageSize, ct);
+        }
+
     }
 }

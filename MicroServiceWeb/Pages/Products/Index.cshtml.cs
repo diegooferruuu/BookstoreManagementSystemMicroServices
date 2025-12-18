@@ -1,8 +1,11 @@
 using MicroServiceWeb.External.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace LibraryWeb.Pages.Products
 {
@@ -11,15 +14,25 @@ namespace LibraryWeb.Pages.Products
         private readonly IProductsApiClient _api;
 
         public List<ProductDto> Products { get; set; } = new();
+        [BindProperty]
+        public int Page { get; set; } = 1;
+        [BindProperty]
+        public int PageSize { get; set; } = 10;
+        public int TotalItems { get; set; }
+        public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling((double)TotalItems / PageSize);
 
-        public IndexModel(IProductsApiClient api)
-        {
-            _api = api;
-        }
+        public IndexModel(IProductsApiClient api) { _api = api; }
 
-        public async Task OnGetAsync(CancellationToken ct)
+        public async Task OnGetAsync(CancellationToken ct, int? pageNumber, int? pageSize)
         {
-            Products = (await _api.GetAllAsync(ct)).ToList();
+            if (pageSize.HasValue && pageSize.Value > 0) PageSize = pageSize.Value;
+            if (pageNumber.HasValue && pageNumber.Value > 0) Page = pageNumber.Value;
+            if (PageSize < 1) PageSize = 10; if (PageSize > 100) PageSize = 100;
+
+            var paged = await _api.GetPagedAsync(Page, PageSize, ct);
+            // Asegurar que backend corrige page/pageSize si salen de rango
+            Page = paged.Page; PageSize = paged.PageSize; TotalItems = paged.TotalItems;
+            Products = paged.Items.ToList();
         }
 
         public IActionResult OnPostEdit(Guid id)
@@ -32,7 +45,7 @@ namespace LibraryWeb.Pages.Products
         {
             var ok = await _api.DeleteAsync(id, ct);
             if (!ok) TempData["ErrorMessage"] = "No se pudo eliminar";
-            return RedirectToPage();
+            return RedirectToPage(new { pageNumber = Page, pageSize = PageSize });
         }
     }
 }

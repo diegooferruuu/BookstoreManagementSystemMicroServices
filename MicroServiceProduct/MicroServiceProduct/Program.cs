@@ -1,3 +1,6 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using MicroServiceProduct.Infraestructure.DataBase;
 using MicroServiceProduct.Infraestructure.Repository;
 using MicroServiceProduct.Domain.Services;
@@ -9,8 +12,8 @@ using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Configure Swagger/Swashbuckle
+// Swagger con esquema Bearer
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "MicroServiceProduct API", Version = "v1" });
@@ -21,17 +24,45 @@ builder.Services.AddSwaggerGen(c =>
     {
         c.IncludeXmlComments(xmlPath);
     }
+
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "Autenticaci�n JWT usando el esquema Bearer. Ejemplo: Bearer {token}",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 // Register controllers so attribute-routed controllers are available
 builder.Services.AddControllers();
+builder.Services.AddAuthorization();
 
 // Get connection string from configuration (appsettings.json)
 var connectionString = builder.Configuration.GetConnectionString("MicroServiceProduct")
-                       ?? builder.Configuration["ConnectionStrings:MicroServiceProduct"];
+                       ?? builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? builder.Configuration["ConnectionStrings:MicroServiceProduct"]
+                       ?? builder.Configuration["ConnectionStrings:DefaultConnection"];
 if (string.IsNullOrWhiteSpace(connectionString))
 {
-    throw new InvalidOperationException("Connection string 'MicroServiceProduct' is not configured. Set it in appsettings.json or the CONNECTION_STRING env var.");
+    throw new InvalidOperationException("Configure ConnectionStrings.DefaultConnection o MicroServiceProduct en appsettings.json.");
 }
 
 // Register infrastructure / domain services
@@ -48,6 +79,63 @@ builder.Services.AddScoped<IProductService, ProductService>();
 // Messaging
 builder.Services.AddSingleton<IEventPublisher, RabbitPublisher>();
 builder.Services.AddHostedService<RabbitConsumerForProduct>();
+// Configuraci�n JWT
+var issuer = builder.Configuration["Jwt:Issuer"];
+var audience = builder.Configuration["Jwt:Audience"];
+var key = builder.Configuration["Jwt:Key"];
+
+if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience) || string.IsNullOrWhiteSpace(key))
+{
+    throw new InvalidOperationException("Configura Jwt:Issuer, Jwt:Audience y Jwt:Key en appsettings.json.");
+}
+
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = builder.Environment.IsDevelopment() ? false : true;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = issuer,
+            ValidAudience = audience,
+            IssuerSigningKey = signingKey,
+            ClockSkew = TimeSpan.Zero
+        };
+
+        // Diagn�stico de errores de validaci�n
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                context.Response.Headers.Add("x-auth-error", context.Exception.GetType().Name);
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                // Agregar detalle del error para depurar en Swagger
+                if (!string.IsNullOrEmpty(context.Error))
+                {
+                    context.Response.Headers.Add("www-authenticate-error", context.Error);
+                }
+                if (!string.IsNullOrEmpty(context.ErrorDescription))
+                {
+                    context.Response.Headers.Add("www-authenticate-error-desc", context.ErrorDescription);
+                }
+                return Task.CompletedTask;
+            }
+        };
+    });
 
 var app = builder.Build();
 
@@ -62,33 +150,12 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Map controller routes (attribute routing)
-app.MapControllers();
-
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+// Map controller routes (attribute routing)
+app.MapControllers().RequireAuthorization();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
