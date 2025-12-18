@@ -73,7 +73,7 @@ namespace MicroServiceWeb.External.Http
                     {
                         try 
                         { 
-                            // Deserialización tolerante con snake_case fallback
+                            // Deserializaciï¿½n tolerante con snake_case fallback
                             var dto = System.Text.Json.JsonSerializer.Deserialize<ProductDto>(el.GetRawText(), options);
                             if (dto == null)
                             {
@@ -172,7 +172,107 @@ namespace MicroServiceWeb.External.Http
         }
     }
 
-    public class SalesApiClient : ISalesApiClient { private readonly HttpClient _http; public SalesApiClient(IHttpClientFactory f)=>_http=f.CreateClient("SalesService"); }
+    public class SalesApiClient : ISalesApiClient
+    {
+        private readonly HttpClient _http;
+        private static readonly JsonSerializerOptions CamelCaseOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+        public SalesApiClient(IHttpClientFactory f) => _http = f.CreateClient("SalesService");
+
+        public async Task<SaleApiResult> CreateAsync(SaleCreateDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var resp = await _http.PostAsJsonAsync("api/sales", dto, CamelCaseOptions, ct);
+                var result = new SaleApiResult { Success = resp.IsSuccessStatusCode };
+
+                if (resp.Content.Headers.ContentType?.MediaType == "application/json")
+                {
+                    var json = await resp.Content.ReadAsStringAsync(ct);
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(json);
+                        var root = doc.RootElement;
+
+                        if (resp.IsSuccessStatusCode)
+                        {
+                            // Parsear la respuesta exitosa
+                            result.Sale = JsonSerializer.Deserialize<SaleDto>(root.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        }
+                        else
+                        {
+                            // Parsear errores de validaciÃ³n
+                            if (root.TryGetProperty("message", out var msgProp))
+                                result.Message = msgProp.GetString();
+
+                            if (root.TryGetProperty("errors", out var errorsProp) && errorsProp.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var error in errorsProp.EnumerateArray())
+                                {
+                                    var field = error.TryGetProperty("field", out var f) ? f.GetString() ?? "general" : "general";
+                                    var message = error.TryGetProperty("message", out var m) ? m.GetString() ?? "Error" : "Error";
+                                    
+                                    if (!result.Errors.ContainsKey(field))
+                                        result.Errors[field] = new List<string>();
+                                    result.Errors[field].Add(message);
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return new SaleApiResult
+                {
+                    Success = false,
+                    Message = $"Error al comunicarse con el servicio: {ex.Message}",
+                    Errors = new Dictionary<string, List<string>> { { "general", new List<string> { ex.Message } } }
+                };
+            }
+        }
+
+        public async Task<SaleDto?> GetByIdAsync(Guid id, CancellationToken ct)
+        {
+            try
+            {
+                var resp = await _http.GetAsync($"api/sales/{id}", ct);
+                if (!resp.IsSuccessStatusCode) return null;
+
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                return JsonSerializer.Deserialize<SaleDto>(json, options);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<SaleStatusResult> GetStatusAsync(Guid id, CancellationToken ct)
+        {
+            try
+            {
+                var resp = await _http.GetAsync($"api/sales/{id}/status", ct);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    return new SaleStatusResult { Status = "PENDING", Message = "Verificando estado de la venta..." };
+                }
+
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                return JsonSerializer.Deserialize<SaleStatusResult>(json, options) 
+                    ?? new SaleStatusResult { Status = "PENDING", Message = "Verificando estado de la venta..." };
+            }
+            catch
+            {
+                return new SaleStatusResult { Status = "PENDING", Message = "Verificando estado de la venta..." };
+            }
+        }
+    }
 
     public class UsersApiClient : IUsersApiClient
     {
@@ -269,10 +369,10 @@ namespace MicroServiceWeb.External.Http
             {
                 using var doc = JsonDocument.Parse(text);
                 var root = doc.RootElement;
-                var msg = root.TryGetProperty("message", out var m) ? m.GetString() : "Error al cambiar contraseña.";
+                var msg = root.TryGetProperty("message", out var m) ? m.GetString() : "Error al cambiar contraseÃ±a.";
                 return new ApiSimpleResult { Success = false, Error = msg };
             }
-            catch { return new ApiSimpleResult { Success = false, Error = "Error al cambiar contraseña." }; }
+            catch { return new ApiSimpleResult { Success = false, Error = "Error al cambiar contraseÃ±a." }; }
         }
 
         private static async Task<AuthLoginResult> ParseAuthResponse(HttpResponseMessage resp, CancellationToken ct)
@@ -314,9 +414,9 @@ namespace MicroServiceWeb.External.Http
                         {
                             msg = status switch
                             {
-                                System.Net.HttpStatusCode.Unauthorized => "Credenciales inválidas o usuario inactivo.",
+                                System.Net.HttpStatusCode.Unauthorized => "Credenciales invÃ¡lidas o usuario inactivo.",
                                 System.Net.HttpStatusCode.Forbidden => "Acceso denegado.",
-                                _ => "Error al iniciar sesión."
+                                _ => "Error al iniciar sesiÃ³n."
                             };
                         }
                         result.Error = msg;
@@ -335,9 +435,9 @@ namespace MicroServiceWeb.External.Http
                 {
                     result.Error = status switch
                     {
-                        System.Net.HttpStatusCode.Unauthorized => "Credenciales inválidas o usuario inactivo.",
+                        System.Net.HttpStatusCode.Unauthorized => "Credenciales invÃ¡lidas o usuario inactivo.",
                         System.Net.HttpStatusCode.Forbidden => "Acceso denegado.",
-                        _ => "Error en la autenticación."
+                        _ => "Error en la autenticaciÃ³n."
                     };
                 }
             }

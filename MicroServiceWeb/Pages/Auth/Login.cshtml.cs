@@ -34,7 +34,7 @@ namespace LibraryWeb.Pages.Auth
                 ErrorMessage = loginResult.Error ?? "Credenciales inválidas.";
                 return Page();
             }
-
+            Console.WriteLine($"Token: {loginResult.Token}");
             // Guardar token para cambio de contraseña si es requerido
             if (!string.IsNullOrEmpty(loginResult.Token)) TempData["PendingToken"] = loginResult.Token;
             if (loginResult.MustChangePassword)

@@ -151,27 +151,31 @@ namespace MicroServiceProduct.Infraestructure.Repository
 
                     using var check = conn.CreateCommand();
                     check.Transaction = tx;
-                    check.CommandText = "SELECT stock FROM products WHERE id = @id FOR UPDATE";
+                    check.CommandText = "SELECT name, stock FROM products WHERE id = @id FOR UPDATE";
                     var pId = check.CreateParameter(); pId.ParameterName = "@id"; pId.Value = productId; check.Parameters.Add(pId);
 
-                    var result = check.ExecuteScalar();
-                    if (result == null || result == DBNull.Value)
+                    using var reader = check.ExecuteReader();
+                    if (!reader.Read())
                     {
-                        error = $"Product {productId} not found";
+                        error = $"Producto no encontrado (ID: {productId})";
+                        reader.Close();
                         tx.Rollback();
                         return false;
                     }
 
-                    var currentStock = Convert.ToInt32(result);
+                    var productName = reader.GetString(0);
+                    var currentStock = reader.GetInt32(1);
+                    reader.Close();
+
                     if (qty <= 0)
                     {
-                        error = $"Invalid quantity {qty} for product {productId}";
+                        error = $"Cantidad inválida ({qty}) para el producto '{productName}'";
                         tx.Rollback();
                         return false;
                     }
                     if (currentStock < qty)
                     {
-                        error = $"Insufficient stock for product {productId}";
+                        error = $"Stock insuficiente para '{productName}'. Solicitado: {qty}, Disponible: {currentStock}";
                         tx.Rollback();
                         return false;
                     }

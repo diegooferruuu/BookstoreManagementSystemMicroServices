@@ -7,7 +7,7 @@
 
 <form method="post" id="mainSaleForm">
     @Html.AntiForgeryToken()
-    <!-- Hidden explícito para SelectedClientId -->
+    <!-- Hidden explï¿½cito para SelectedClientId -->
     <input type="hidden" name="SelectedClientId" id="hiddenSelectedClientId" value="@clientIdValue" />
 
     @for (var i = 0; i < Model.Items.Count; i++)
@@ -75,7 +75,7 @@
                 </div>
             </div>
 
-            <!-- Resultados de búsqueda de cliente (solo mostrar si NO hay cliente seleccionado) -->
+            <!-- Resultados de bï¿½squeda de cliente (solo mostrar si NO hay cliente seleccionado) -->
             @if (Model.SelectedClient == null)
             {
                 @if (Model.ClientSuggestions?.Count > 0)
@@ -86,7 +86,7 @@
                                 <tr>
                                     <th class="th-blue">CI/NIT</th>
                                     <th class="th-blue">Nombre Completo</th>
-                                    <th class="th-blue text-center" style="width:180px">Acción</th>
+                                    <th class="th-blue text-center" style="width:180px">Acciï¿½n</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -109,8 +109,8 @@
                 else if (!string.IsNullOrWhiteSpace(Model.ClientSearch))
                 {
                     <div class="alert alert-warning mb-4">
-                        <i class="fas fa-exclamation-triangle me-1"></i>No se encontró cliente con CI/NIT "<strong>@Model.ClientSearch</strong>". 
-                        Puedes crear uno nuevo con el botón <strong>+</strong>.
+                        <i class="fas fa-exclamation-triangle me-1"></i>No se encontrÃ³ cliente con CI/NIT "<strong>@Model.ClientSearch</strong>". 
+                        Puedes crear uno nuevo con el botÃ³n <strong>"+"</strong>.
                     </div>
                 }
             }
@@ -133,7 +133,7 @@
                 <div id="productSuggestionsList" class="list-group position-absolute shadow" style="z-index:1050; max-height:300px; overflow-y:auto;"></div>
             </div>
 
-            <!-- Resultados de búsqueda de productos -->
+            <!-- Resultados de bï¿½squeda de productos -->
             @if (Model.ProductSuggestions?.Count > 0)
             {
                 <div class="table-responsive mb-4">
@@ -142,7 +142,7 @@
                             <tr>
                                 <th class="th-blue">Producto</th>
                                 <th class="th-blue text-end" style="width:140px">Precio</th>
-                                <th class="th-blue text-center" style="width:140px">Acción</th>
+                                <th class="th-blue text-center" style="width:140px">Acciï¿½n</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -170,7 +170,7 @@
                     <thead>
                         <tr>
                             <th class="th-blue" style="width:160px">Cantidad</th>
-                            <th class="th-blue">Descripción</th>
+                            <th class="th-blue">DescripciÃ³n</th>
                             <th class="th-blue text-end" style="width:140px">P. Unitario</th>
                             <th class="th-blue text-end" style="width:140px">Importe</th>
                             <th class="th-blue text-center" style="width:100px">Quitar</th>
@@ -220,9 +220,9 @@
                 <button type="submit" formaction="?handler=Save" class="btn btn-success btn-lg">
                     <i class="fas fa-save me-1"></i>Guardar Venta
                 </button>
-                <a asp-page="/Sales/Index" class="btn btn-secondary btn-lg">
-                    <i class="fas fa-times me-1"></i>Cancelar
-                </a>
+                    <a asp-page="/Sales/Index" class="btn btn-danger btn-lg">
+                        <i class="fas fa-times me-1 "></i>Cancelar
+                    </a>
             </div>
         </div>
     </div>
@@ -269,12 +269,12 @@
                     <span class="text-danger small" asp-validation-for="NewClient.Email"></span>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Teléfono *</label>
+                    <label class="form-label">TelÃ³fono *</label>
                     <input asp-for="NewClient.Phone" class="form-control" maxlength="8" />
                     <span class="text-danger small" asp-validation-for="NewClient.Phone"></span>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Dirección *</label>
+                    <label class="form-label">DirecciÃ³n *</label>
                     <input asp-for="NewClient.Address" class="form-control" />
                     <span class="text-danger small" asp-validation-for="NewClient.Address"></span>
                 </div>
@@ -300,7 +300,7 @@
         var productList = document.getElementById('productSuggestionsList');
         var hiddenClientId = document.getElementById('hiddenSelectedClientId');
 
-        // Enter en búsqueda de producto dispara SearchProduct
+        // Enter en bï¿½squeda de producto dispara SearchProduct
         if (inputProduct) {
             inputProduct.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
@@ -311,7 +311,7 @@
             });
         }
 
-        // Enter en búsqueda de cliente dispara SearchClient (solo si no hay cliente seleccionado)
+        // Enter en bï¿½squeda de cliente dispara SearchClient (solo si no hay cliente seleccionado)
         if (inputClient && !inputClient.hasAttribute('readonly')) {
             inputClient.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
@@ -322,7 +322,7 @@
             });
         }
 
-        // CLIENTE: Autocompletar dinámico (solo si no hay cliente seleccionado)
+        // CLIENTE: Autocompletar dinï¿½mico (solo si no hay cliente seleccionado)
         var clientTimer;
         if (inputClient && clientList && !inputClient.hasAttribute('readonly')) {
             inputClient.addEventListener('input', function() {
@@ -358,7 +358,7 @@
             });
         }
 
-        // PRODUCTO: Autocompletar dinámico
+        // PRODUCTO: Autocompletar dinï¿½mico
         var productTimer;
         if (inputProduct && productList) {
             inputProduct.addEventListener('input', function() {
@@ -392,6 +392,79 @@
             });
         }
     })();
+    
+    // FunciÃ³n para mostrar alertas
+    function showAlert(message, type) {
+        // Remover alertas anteriores del mismo tipo si existen
+        var existingAlerts = document.querySelectorAll('.alert.position-fixed');
+        existingAlerts.forEach(function(alert) {
+            if (type === 'info' || alert.classList.contains('alert-info')) {
+                alert.remove();
+            }
+        });
+        
+        var alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-' + type + ' alert-dismissible fade show position-fixed';
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 350px; max-width: 500px;';
+        var icon = type === 'success' ? 'check-circle' : (type === 'danger' ? 'exclamation-triangle' : 'info-circle');
+        alertDiv.innerHTML = '<i class="fas fa-' + icon + ' me-2"></i>' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        document.body.appendChild(alertDiv);
+        setTimeout(function() { alertDiv.remove(); }, type === 'danger' ? 10000 : 5000);
+    }
+    
+    // FunciÃ³n para verificar el estado de la venta con polling
+    function checkSaleStatus(saleId, maxAttempts, currentAttempt) {
+        console.log('Verificando estado de venta. Intento ' + (currentAttempt + 1) + ' de ' + maxAttempts);
+        
+        if (currentAttempt >= maxAttempts) {
+            showAlert('No se pudo confirmar el estado de la venta. Por favor verifique manualmente en el listado de ventas.', 'warning');
+            return;
+        }
+        
+        // URLs de los microservicios desde el modelo
+        var salesApiUrl = '@Model.SalesApiUrl';
+        var reportsApiUrl = '@Model.ReportsApiUrl';
+        
+        fetch(salesApiUrl + '/api/sales/' + saleId + '/status')
+            .then(function(r) { 
+                console.log('Respuesta del servidor:', r.status);
+                if (!r.ok) {
+                    throw new Error('HTTP ' + r.status);
+                }
+                return r.json(); 
+            })
+            .then(function(data) {
+                console.log('Estado de venta:', data);
+                
+                if (data.status === 'COMPLETED') {
+                    // Venta exitosa - abrir PDF
+                    showAlert('<strong>Â¡Venta exitosa!</strong> Abriendo comprobante...', 'success');
+                    var pdfUrl = reportsApiUrl + '/api/reports/sale/' + saleId + '/pdf';
+                    setTimeout(function() {
+                        var pdfWindow = window.open(pdfUrl, '_blank');
+                        if (!pdfWindow) {
+                            showAlert('Por favor, habilite las ventanas emergentes para ver el comprobante. <a href="' + pdfUrl + '" target="_blank" class="alert-link">Click aquÃ­ para abrir</a>', 'warning');
+                        }
+                    }, 500);
+                } else if (data.status === 'CANCELLED') {
+                    // Venta rechazada - mostrar mensaje de error
+                    showAlert('<strong>Venta cancelada:</strong> ' + (data.message || 'Stock insuficiente para completar la venta.'), 'danger');
+                } else {
+                    // TodavÃ­a en proceso - reintentar
+                    console.log('Estado pendiente, reintentando en 1.5 segundos...');
+                    setTimeout(function() {
+                        checkSaleStatus(saleId, maxAttempts, currentAttempt + 1);
+                    }, 1500);
+                }
+            })
+            .catch(function(err) {
+                console.error('Error verificando estado:', err);
+                // Reintentar en caso de error de red
+                setTimeout(function() {
+                    checkSaleStatus(saleId, maxAttempts, currentAttempt + 1);
+                }, 2000);
+            });
+    }
     </script>
 
     @if (TempData["OpenClientModal"] as bool? == true)
@@ -403,4 +476,23 @@
             });
         </script>
     }
+
+    @if (TempData["OpenPdf"] as bool? == true && TempData["SaleId"] != null)
+    {
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var saleId = '@TempData["SaleId"]';
+                
+                // Mostrar mensaje de procesamiento
+                showAlert('<i class="fas fa-spinner fa-spin me-2"></i>Procesando venta, por favor espere...', 'info');
+                
+                // Iniciar polling para verificar el estado de la venta
+                // Esperar 1 segundo antes de empezar para dar tiempo al proceso asÃ­ncrono
+                setTimeout(function() {
+                    checkSaleStatus(saleId, 30, 0); // MÃ¡ximo 30 intentos (45 segundos aprox)
+                }, 1000);
+            });
+        </script>
+    }
 }
+

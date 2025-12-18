@@ -82,13 +82,13 @@ namespace MicroServiceSales.Infrastructure.Messaging
 
                 try
                 {
+                    // Extraer datos comunes
+                    string? userName = root.TryGetProperty("UserName", out var userNameElem) ? userNameElem.GetString() : null;
+                    string? clientName = root.TryGetProperty("ClientName", out var clientNameElem) ? clientNameElem.GetString() : null;
+                    string? clientCi = root.TryGetProperty("ClientCi", out var clientCiElem) ? clientCiElem.GetString() : null;
+
                     if (status == "APPROVED")
                     {
-                        // Extraer datos de usuario y cliente
-                        string? userName = root.TryGetProperty("UserName", out var userNameElem) ? userNameElem.GetString() : null;
-                        string? clientName = root.TryGetProperty("ClientName", out var clientNameElem) ? clientNameElem.GetString() : null;
-                        string? clientCi = root.TryGetProperty("ClientCi", out var clientCiElem) ? clientCiElem.GetString() : null;
-                        
                         // Reconstruir la venta desde el mensaje
                         var sale = new MicroServiceSales.Domain.Models.Sale
                         {
@@ -144,6 +144,7 @@ namespace MicroServiceSales.Infrastructure.Messaging
                             Ci = clientCi ?? "Sin CI",
                             Client = clientName ?? "Cliente Desconocido",
                             Total = sale.Total,
+                            Status = "CONFIRMED",
                             Products = details.Select(d => new
                             {
                                 ProductId = d.ProductId.ToString(),
@@ -157,9 +158,50 @@ namespace MicroServiceSales.Infrastructure.Messaging
                     }
                     else if (status == "REJECTED")
                     {
-                        string error = root.GetProperty("Error").GetString() ?? "Unknown error";
+                        string error = root.TryGetProperty("Error", out var errorElem) 
+                            ? errorElem.GetString() ?? "Unknown error" 
+                            : "Unknown error";
+                        
                         _log.LogWarning("Venta {saleId} rechazada: {error}", saleId, error);
-                        // Aquí podrías notificar al cliente o tomar otra acción
+
+                        // Guardar la venta con estado CANCELLED para tener registro
+                        var sale = new MicroServiceSales.Domain.Models.Sale
+                        {
+                            Id = saleId,
+                            UserId = root.GetProperty("UserId").GetGuid(),
+                            UserName = userName,
+                            ClientId = root.GetProperty("ClientId").GetGuid(),
+                            ClientName = clientName,
+                            ClientCi = clientCi,
+                            Subtotal = root.GetProperty("Subtotal").GetDecimal(),
+                            Total = root.GetProperty("Total").GetDecimal(),
+                            SaleDate = root.GetProperty("SaleDate").GetDateTimeOffset(),
+                            Status = "CANCELLED",
+                            CancellationReason = error,
+                            CancelledAt = DateTimeOffset.UtcNow,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        };
+
+                        // Guardar venta cancelada para tener historial
+                        salesRepo.Create(sale);
+
+                        _log.LogInformation("Venta {saleId} guardada en DB con estado CANCELLED", saleId);
+
+                        // Publicar sales.rejected para que Reports también lo registre
+                        await publisher.PublishAsync("sales.rejected", new
+                        {
+                            SaleId = saleId.ToString(),
+                            Date = sale.SaleDate.ToString("o"),
+                            User = userName ?? "Usuario Desconocido",
+                            Ci = clientCi ?? "Sin CI",
+                            Client = clientName ?? "Cliente Desconocido",
+                            Total = sale.Total,
+                            Status = "REJECTED",
+                            Error = error,
+                            RejectedAt = DateTimeOffset.UtcNow.ToString("o")
+                        });
+
+                        _log.LogInformation("Evento sales.rejected publicado para saleId={saleId}", saleId);
                     }
                 }
                 catch (Exception ex)

@@ -43,19 +43,23 @@ namespace MicroServiceSales.Domain.Models
         [Display(Name = "Estado")]
         [Required(ErrorMessage = "El estado es obligatorio.")]
         [StringLength(20, ErrorMessage = "El estado no debe superar los 20 caracteres.")]
-        [RegularExpression("^(COMPLETED|CANCELLED|PENDING|REFUNDED)$", ErrorMessage = "Estado inv�lido.")]
+        [RegularExpression("^(COMPLETED|CANCELLED|PENDING|REFUNDED)$", ErrorMessage = "Estado inválido.")]
         public string Status { get; set; } = "COMPLETED";
 
-        [Display(Name = "Fecha de cancelaci�n")]
+        [Display(Name = "Motivo de cancelación")]
+        [StringLength(500, ErrorMessage = "El motivo no debe superar los 500 caracteres.")]
+        public string? CancellationReason { get; set; }
+
+        [Display(Name = "Fecha de cancelación")]
         public DateTimeOffset? CancelledAt { get; set; }
 
         [Display(Name = "Cancelado por")]
         public Guid? CancelledBy { get; set; }
 
-        [Display(Name = "Fecha de creaci�n")]
+        [Display(Name = "Fecha de creación")]
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-        // Detalles de la venta (relaci�n 1..n)
+        // Detalles de la venta (relación 1..n)
         public List<SaleDetail> Details { get; set; } = new List<SaleDetail>();
     }
 }

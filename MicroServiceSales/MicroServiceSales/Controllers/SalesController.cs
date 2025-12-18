@@ -35,6 +35,37 @@ namespace MicroServiceSales.Controllers
             return Ok(sale);
         }
 
+        // GET: api/sales/{id}/status
+        // Endpoint para verificar el estado de una venta (usado por el frontend para polling)
+        [HttpGet("{id:guid}/status")]
+        public ActionResult GetStatus(Guid id)
+        {
+            var sale = _service.Read(id);
+            if (sale is null)
+            {
+                // La venta aún no existe en la DB (puede estar en proceso o nunca existió)
+                return Ok(new { 
+                    Status = "PENDING", 
+                    Message = "La venta está siendo procesada..." 
+                });
+            }
+            
+            // La venta existe, retornar su estado con mensaje específico
+            var message = sale.Status switch
+            {
+                "COMPLETED" => "Venta completada exitosamente",
+                "CANCELLED" => sale.CancellationReason ?? "La venta fue cancelada por falta de stock",
+                "PENDING" => "La venta está siendo procesada...",
+                "REFUNDED" => "La venta fue reembolsada",
+                _ => $"Estado: {sale.Status}"
+            };
+            
+            return Ok(new { 
+                Status = sale.Status,
+                Message = message
+            });
+        }
+
         // GET: api/sales/{id}/details
         [HttpGet("{id:guid}/details")]
         public ActionResult<List<SaleDetail>> GetDetails(Guid id)
@@ -58,7 +89,7 @@ namespace MicroServiceSales.Controllers
             {
                 return BadRequest(new
                 {
-                    Message = "Errores de validaci�n",
+                    Message = "Errores de validación",
                     Errors = ex.Errors.Select(e => new { e.Field, e.Message })
                 });
             }
@@ -79,7 +110,7 @@ namespace MicroServiceSales.Controllers
             {
                 return BadRequest(new
                 {
-                    Message = "Errores de validaci�n",
+                    Message = "Errores de validación",
                     Errors = ex.Errors.Select(e => new { e.Field, e.Message })
                 });
             }

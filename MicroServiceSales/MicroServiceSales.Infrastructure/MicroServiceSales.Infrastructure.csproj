@@ -18,6 +18,7 @@
   <ItemGroup>
     <Folder Include="Repositories\" />
     <Folder Include="Messaging\" />
+    <Folder Include="sql\" />
   </ItemGroup>
 
   <ItemGroup>

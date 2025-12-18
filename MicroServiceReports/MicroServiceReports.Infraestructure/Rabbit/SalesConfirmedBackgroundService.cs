@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -18,9 +19,9 @@ namespace MicroServiceReports.Infraestructure.Rabbit
     {
         public string Host { get; set; } = "localhost";
         public int Port { get; set; } = 5672;
-        public string Exchange { get; set; } = "ventas.events";
-        public string RoutingKey { get; set; } = "venta.confirmada";
-        public string Queue { get; set; } = "ventas.confirmadas.queue";
+        public string Exchange { get; set; } = "saga.exchange";
+        public string RoutingKey { get; set; } = "sales.confirmed";
+        public string Queue { get; set; } = "reports.queue";
         public string UserName { get; set; } = "guest";
         public string Password { get; set; } = "guest";
     }
@@ -122,11 +123,12 @@ namespace MicroServiceReports.Infraestructure.Rabbit
             {
                 using var scope = _scopeFactory.CreateScope();
                 var repo = scope.ServiceProvider.GetRequiredService<ISaleEventRepository>();
+                var detailRepo = scope.ServiceProvider.GetRequiredService<ISaleDetailRepository>();
 
                 var record = new SaleEventRecord
                 {
                     Id = Guid.NewGuid(),
-                    SaleId = saleId,
+                    SaleId = (saleId),
                     Payload = payload,
                     Exchange = ea.Exchange,
                     RoutingKey = ea.RoutingKey,
@@ -134,6 +136,9 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                 };
 
                 await repo.SaveAsync(record).ConfigureAwait(false);
+
+                // Extraer y guardar los detalles de productos
+                await SaveSaleDetailsAsync(payload, saleId, detailRepo).ConfigureAwait(false);
 
                 // ACK only after successful save
                 if (_channel != null) await _channel.BasicAckAsync(ea.DeliveryTag, false);
@@ -151,6 +156,109 @@ namespace MicroServiceReports.Infraestructure.Rabbit
                 {
                     _logger.LogError(nackEx, "Failed to NACK message. DeliveryTag={DeliveryTag}", ea.DeliveryTag);
                 }
+            }
+        }
+
+        private async Task SaveSaleDetailsAsync(string payload, string saleId, ISaleDetailRepository detailRepo)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(payload);
+                var root = doc.RootElement;
+
+                // Buscar la propiedad Products (puede ser "Products" o "products")
+                JsonElement productsElement;
+                if (!root.TryGetProperty("Products", out productsElement))
+                {
+                    if (!root.TryGetProperty("products", out productsElement))
+                    {
+                        _logger.LogWarning("No Products array found in message for SaleId={SaleId}", saleId);
+                        return;
+                    }
+                }
+
+                if (productsElement.ValueKind != JsonValueKind.Array)
+                {
+                    _logger.LogWarning("Products is not an array for SaleId={SaleId}", saleId);
+                    return;
+                }
+
+                var details = new List<SaleDetailRecord>();
+                var now = DateTime.UtcNow;
+
+                foreach (var product in productsElement.EnumerateArray())
+                {
+                    var detail = new SaleDetailRecord
+                    {
+                        Id = Guid.NewGuid(),
+                        SaleId = saleId,
+                        CreatedAt = now
+                    };
+
+                    // ProductId
+                    if (product.TryGetProperty("ProductId", out var productIdProp))
+                    {
+                        detail.ProductId = productIdProp.GetString() ?? string.Empty;
+                    }
+                    else if (product.TryGetProperty("productId", out var productIdLower))
+                    {
+                        detail.ProductId = productIdLower.GetString() ?? string.Empty;
+                    }
+
+                    // ProductName / Name
+                    if (product.TryGetProperty("Name", out var nameProp))
+                    {
+                        detail.ProductName = nameProp.GetString() ?? string.Empty;
+                    }
+                    else if (product.TryGetProperty("name", out var nameLower))
+                    {
+                        detail.ProductName = nameLower.GetString() ?? string.Empty;
+                    }
+                    else if (product.TryGetProperty("ProductName", out var productNameProp))
+                    {
+                        detail.ProductName = productNameProp.GetString() ?? string.Empty;
+                    }
+                    else if (product.TryGetProperty("productName", out var productNameLower))
+                    {
+                        detail.ProductName = productNameLower.GetString() ?? string.Empty;
+                    }
+
+                    // Quantity
+                    if (product.TryGetProperty("Quantity", out var quantityProp))
+                    {
+                        detail.Quantity = quantityProp.GetInt32();
+                    }
+                    else if (product.TryGetProperty("quantity", out var quantityLower))
+                    {
+                        detail.Quantity = quantityLower.GetInt32();
+                    }
+
+                    // UnitPrice
+                    if (product.TryGetProperty("UnitPrice", out var unitPriceProp))
+                    {
+                        detail.UnitPrice = unitPriceProp.GetDecimal();
+                    }
+                    else if (product.TryGetProperty("unitPrice", out var unitPriceLower))
+                    {
+                        detail.UnitPrice = unitPriceLower.GetDecimal();
+                    }
+
+                    // Calcular Subtotal
+                    detail.Subtotal = detail.UnitPrice * detail.Quantity;
+
+                    details.Add(detail);
+                }
+
+                if (details.Count > 0)
+                {
+                    await detailRepo.SaveManyAsync(details).ConfigureAwait(false);
+                    _logger.LogInformation("Saved {Count} sale details for SaleId={SaleId}", details.Count, saleId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse and save sale details for SaleId={SaleId}", saleId);
+                throw; // Re-throw para que el mensaje se reencole
             }
         }
 
