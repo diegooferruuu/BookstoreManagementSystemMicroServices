@@ -26,7 +26,9 @@
         <textarea asp-for="Distributor.Address" class="form-control"></textarea>
         <span class="text-danger" asp-validation-for="Distributor.Address"></span>
     </div>
-    <button type="submit" class="btn btn-primary">Crear</button>
-    <a asp-page="Index" class="btn btn-secondary">Cancelar</a>
+    <div class="d-flex justify-content-end gap-2">
+        <button type="submit" class="btn btn-primary">Crear</button>
+        <a asp-page="Index" class="btn btn-secondary">Cancelar</a>
+    </div>
 </form>
 @section Scripts { <partial name="Shared/_ValidationScriptsPartial" /> }

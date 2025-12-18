@@ -416,6 +416,17 @@ namespace MicroServiceWeb.External.Http
                         try
                         {
                             var dto = System.Text.Json.JsonSerializer.Deserialize<ClientDto>(el.GetRawText(), options);
+                            if (dto == null)
+                            {
+                                var id = el.TryGetProperty("id", out var idP) && Guid.TryParse(idP.GetString(), out var gid) ? gid : Guid.Empty;
+                                var firstName = el.TryGetProperty("firstName", out var fnP) ? fnP.GetString() ?? string.Empty : string.Empty;
+                                var lastName = el.TryGetProperty("lastName", out var lnP) ? lnP.GetString() ?? string.Empty : string.Empty;
+                                var ci = el.TryGetProperty("ci", out var ciP) ? (ciP.GetString() ?? string.Empty) : string.Empty;
+                                var email = el.TryGetProperty("email", out var emP) ? emP.GetString() : null;
+                                var phone = el.TryGetProperty("phone", out var phP) ? phP.GetString() : null;
+                                var address = el.TryGetProperty("address", out var adP) ? adP.GetString() : null;
+                                dto = new ClientDto(id, firstName, lastName, ci, email, phone, address);
+                            }
                             if (dto != null) items.Add(dto);
                         }
                         catch { }

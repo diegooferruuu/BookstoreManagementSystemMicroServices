@@ -16,5 +16,6 @@ namespace MicroServiceClient.Domain.Interfaces
         void Create(Client client);
         void Update(Client client);
         void Delete(Guid id);
+        bool ExistsByCi(string ci, Guid? excludeId = null);
     }
 }

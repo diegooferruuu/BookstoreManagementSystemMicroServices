@@ -78,6 +78,7 @@ public record ClientDto(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("firstName")] string FirstName,
     [property: JsonPropertyName("lastName")] string LastName,
+    [property: JsonPropertyName("ci")] string Ci,
     [property: JsonPropertyName("email")] string? Email,
     [property: JsonPropertyName("phone")] string? Phone,
     [property: JsonPropertyName("address")] string? Address);
@@ -158,6 +159,7 @@ public class ClientCreateDto
 {
     [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), RegularExpression(@"^[A-Za-zÁÉÍÓÚÑáéíóúÜüñ' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Nombre")] public string FirstName { get; set; } = string.Empty;
     [Required(ErrorMessage = "El apellido es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), RegularExpression(@"^[A-Za-zÁÉÍÓÚÑáéíóúÜüñ' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Apellido")] public string LastName { get; set; } = string.Empty;
+    [Required(ErrorMessage = "El CI es obligatorio."), StringLength(20), RegularExpression(@"^\d{5,10}(-(LP|CB|SC|CH|OR|PT|TJ|BN|PD))?$", ErrorMessage = "CI inválido. Ej: 1234567-CB"), Display(Name = "CI")] public string Ci { get; set; } = string.Empty;
     [Required(ErrorMessage = "El correo electrónico es obligatorio."), EmailAddress(ErrorMessage = "Correo inválido."), MaxLength(150, ErrorMessage = "Máximo 150 caracteres."), Display(Name = "Correo electrónico")] public string? Email { get; set; }
     [Required(ErrorMessage = "El teléfono es obligatorio."), RegularExpression(@"^\d{8}$", ErrorMessage = "Debe tener 8 dígitos."), Display(Name = "Teléfono")] public string? Phone { get; set; }
     [Required(ErrorMessage = "La dirección es obligatoria."), MinLength(5, ErrorMessage = "Mínimo 5 caracteres."), MaxLength(255, ErrorMessage = "Máximo 255 caracteres."), Display(Name = "Dirección")] public string? Address { get; set; }

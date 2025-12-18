@@ -16,6 +16,7 @@ namespace LibraryWeb.Pages.Clients
             // Normalizar espacios
             Client.FirstName = Client.FirstName?.Trim() ?? string.Empty;
             Client.LastName = Client.LastName?.Trim() ?? string.Empty;
+            Client.Ci = Client.Ci?.Trim() ?? string.Empty;
             Client.Email = Client.Email?.Trim();
             Client.Phone = Client.Phone?.Trim();
             Client.Address = Client.Address?.Trim();
@@ -30,6 +31,7 @@ namespace LibraryWeb.Pages.Clients
                     {
                         "firstName" => "Client.FirstName",
                         "lastName" => "Client.LastName",
+                        "ci" => "Client.Ci",
                         "email" => "Client.Email",
                         "phone" => "Client.Phone",
                         "address" => "Client.Address",
