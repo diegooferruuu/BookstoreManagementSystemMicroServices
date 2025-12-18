@@ -8,11 +8,13 @@ namespace LibraryWeb.Pages.Sales
     {
         private readonly IClientsApiClient _clients;
         private readonly IProductsApiClient _products;
+        private readonly ISalesApiClient _sales;
 
-        public CreateModel(IClientsApiClient clients, IProductsApiClient products)
+        public CreateModel(IClientsApiClient clients, IProductsApiClient products, ISalesApiClient sales)
         {
             _clients = clients;
             _products = products;
+            _sales = sales;
         }
 
         // === Propiedades de binding ===
@@ -111,7 +113,7 @@ namespace LibraryWeb.Pages.Sales
                 .Take(20)
                 .ToList();
 
-            // Si hay match exacto 鷑ico, seleccionar autom醫icamente
+            // Si hay match exacto 锟絥ico, seleccionar autom锟絫icamente
             var exact = ClientSuggestions.FirstOrDefault(c => Normalize(c.Ci) == search);
             if (exact != null && ClientSuggestions.Count == 1)
             {
@@ -133,7 +135,7 @@ namespace LibraryWeb.Pages.Sales
             return Page();
         }
 
-        // === CLIENTE: Quitar selecci髇 ===
+        // === CLIENTE: Quitar selecci锟絥 ===
         public Task<IActionResult> OnPostClearClientAsync()
         {
             SelectedClientId = null;
@@ -182,7 +184,7 @@ namespace LibraryWeb.Pages.Sales
                 return Page();
             }
 
-            // Buscar el cliente reci閚 creado
+            // Buscar el cliente reci锟絥 creado
             var created = result.Client;
             if (created == null)
             {
@@ -342,9 +344,77 @@ namespace LibraryWeb.Pages.Sales
                 return Page();
             }
 
-            // TODO: Llamar al microservicio de ventas
+            // Obtener informaci贸n del usuario desde los Claims
+            var userNameClaim = User.Identity?.Name;
+            
+            if (string.IsNullOrEmpty(userNameClaim))
+            {
+                ModelState.AddModelError("", "Debe iniciar sesi贸n para realizar una venta.");
+                return Page();
+            }
+
+            // Usar un GUID fijo por ahora o buscar el usuario en el microservicio
+            // En producci贸n deber铆as tener el UserId en los claims o buscarlo por nombre
+            var userId = Guid.NewGuid(); // Temporal: generar nuevo ID por cada venta
+            var userName = userNameClaim;
+
+            // Calcular totales
+            var subtotal = Items.Sum(i => i.Total);
+            var total = subtotal; // Aqu铆 podr铆as agregar impuestos, descuentos, etc.
+
+            // Construir el DTO para la venta
+            var saleDto = new SaleCreateDto
+            {
+                ClientId = SelectedClientId.Value,
+                ClientName = $"{SelectedClient.FirstName} {SelectedClient.LastName}",
+                ClientCi = SelectedClient.Ci,
+                UserId = userId,
+                UserName = userName,
+                Subtotal = subtotal,
+                Total = total,
+                Details = Items.Select(item => new SaleDetailCreateDto
+                {
+                    ProductId = item.ProductId,
+                    ProductName = item.Description,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice
+                }).ToList()
+            };
+
+            // Llamar al microservicio de ventas
+            var result = await _sales.CreateAsync(saleDto, ct);
+
+            if (!result.Success)
+            {
+                // Mostrar errores de validaci贸n
+                if (!string.IsNullOrEmpty(result.Message))
+                    ModelState.AddModelError("", result.Message);
+
+                foreach (var error in result.Errors)
+                {
+                    foreach (var msg in error.Value)
+                        ModelState.AddModelError(error.Key, msg);
+                }
+
+                return Page();
+            }
+
+            // Venta creada exitosamente
+            var saleId = result.Sale?.Id ?? Guid.Empty;
+            
+            if (saleId == Guid.Empty)
+            {
+                ModelState.AddModelError("", "La venta se cre贸 pero no se obtuvo el ID.");
+                return Page();
+            }
+
+            // Guardar el SaleId en TempData para abrir el PDF autom谩ticamente
+            TempData["SaleId"] = saleId.ToString();
             TempData["Success"] = "Venta registrada correctamente.";
-            return RedirectToPage("/Sales/Index");
+            TempData["OpenPdf"] = true;
+            
+            // Redirigir a una p谩gina de confirmaci贸n o volver a crear
+            return RedirectToPage("/Sales/Create");
         }
     }
 }

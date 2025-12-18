@@ -27,7 +27,8 @@ builder.Services.Configure<RequestLocalizationOptions>(options => { options.Defa
 // === Registro de HttpClients para microservicios ===
 builder.Services.AddHttpClient("ProductsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Products"] ?? "https://localhost:57307/"))
                 .AddHttpMessageHandler<AuthHeaderHandler>();
-builder.Services.AddHttpClient("SalesService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Sales"] ?? "https://placeholder-sales"));
+builder.Services.AddHttpClient("SalesService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Sales"] ?? "http://localhost:50400/"))
+                .AddHttpMessageHandler<AuthHeaderHandler>();
 builder.Services.AddHttpClient("UsersService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Users"] ?? "https://placeholder-users"))
                 .AddHttpMessageHandler<AuthHeaderHandler>();
 builder.Services.AddHttpClient("ClientsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Clients"] ?? "https://placeholder-clients"))
@@ -51,7 +52,7 @@ builder.Services.AddSingleton<IClientService, StubClientService>();
 builder.Services.AddSingleton<IDistributorService, StubDistributorService>();
 builder.Services.AddSingleton<ISalesReportService, StubSalesReportService>();
 
-// Autenticación Cookie y políticas de autorización
+// Autenticaciï¿½n Cookie y polï¿½ticas de autorizaciï¿½n
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -94,8 +95,8 @@ builder.Services.AddRazorPages(options =>
 })
 .AddMvcOptions(options =>
 {
-    options.ModelBindingMessageProvider.SetValueMustNotBeNullAccessor(_ => "Debe seleccionar una categoría.");
-    options.ModelBindingMessageProvider.SetAttemptedValueIsInvalidAccessor((x, y) => "El valor ingresado no es válido.");
+    options.ModelBindingMessageProvider.SetValueMustNotBeNullAccessor(_ => "Debe seleccionar una categorï¿½a.");
+    options.ModelBindingMessageProvider.SetAttemptedValueIsInvalidAccessor((x, y) => "El valor ingresado no es vï¿½lido.");
     options.ModelBindingMessageProvider.SetMissingBindRequiredValueAccessor(x => $"Falta el valor para {x}.");
 });
 
@@ -114,7 +115,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
-    // Forzar cambio de contraseña: si hay flag en TempData se maneja en página; si ya autenticado con claim MustChange (no usamos claim), bloqueamos rutas protegidas
+    // Forzar cambio de contraseï¿½a: si hay flag en TempData se maneja en pï¿½gina; si ya autenticado con claim MustChange (no usamos claim), bloqueamos rutas protegidas
     if (context.User?.Identity?.IsAuthenticated == true)
     {
         // Nada adicional, el flujo de primera vez se maneja antes de crear cookie.
@@ -122,6 +123,29 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseAuthorization();
+
+// === Endpoint para obtener PDF de comprobante de venta ===
+app.MapGet("/api/reports/sale/{saleId}/pdf", async (Guid saleId, IHttpClientFactory httpClientFactory) =>
+{
+    try
+    {
+        using var client = httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri(builder.Configuration["Services:Reports"] ?? "http://localhost:7200/");
+        
+        var response = await client.GetAsync($"api/reports/sale/{saleId}/pdf");
+        
+        if (!response.IsSuccessStatusCode)
+            return Results.NotFound($"No se encontrÃ³ el comprobante para la venta {saleId}");
+        
+        var pdfBytes = await response.Content.ReadAsByteArrayAsync();
+        return Results.File(pdfBytes, "application/pdf", $"Comprobante-{saleId}.pdf");
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Error al obtener el PDF: {ex.Message}");
+    }
+}).RequireAuthorization();
+
 app.MapRazorPages();
 app.Run();
 
@@ -132,7 +156,7 @@ public class StubUserService : IUserService
     private readonly List<ServiceUsers.Domain.Models.User> _users = new();
     public StubUserService()
     {
-        // Predefinido: deben cambiar contraseña en primer login
+        // Predefinido: deben cambiar contraseï¿½a en primer login
         _users.Add(new ServiceUsers.Domain.Models.User { Username = "admin", Email = "admin@test.local", Roles = new List<string>{"Admin"}, PasswordHash = "admin", MustChangePassword = true });
         _users.Add(new ServiceUsers.Domain.Models.User { Username = "empleado", Email = "empleado@test.local", Roles = new List<string>{"Employee"}, PasswordHash = "empleado", MustChangePassword = true });
     }
@@ -158,7 +182,7 @@ public class StubJwtAuthService : IJwtAuthService
         var result = new ServiceUsers.Application.DTOs.SignInResult();
         if (usr == null || usr.PasswordHash != request.Password)
         {
-            result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "Credentials", Message = "Credenciales inválidas" });
+            result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "Credentials", Message = "Credenciales invï¿½lidas" });
             return Task.FromResult(result);
         }
         result.Value = new ServiceUsers.Application.DTOs.AuthResponseDto
@@ -173,7 +197,7 @@ public class StubJwtAuthService : IJwtAuthService
             MustChangePassword = usr.MustChangePassword
         };
         if (usr.MustChangePassword)
-            result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "MustChangePassword", Message = "Debe cambiar contraseña" });
+            result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "MustChangePassword", Message = "Debe cambiar contraseï¿½a" });
         return Task.FromResult(result);
     }
 }
