@@ -26,5 +26,8 @@ namespace MicroServiceProduct.Application.Services
         public void Delete(Guid id) => _repo.Delete(id);
 
         public List<Product> GetAll() => _repo.GetAll();
+
+        public bool TryReserveStock(Dictionary<Guid, int> items, out string? error)
+            => _repo.TryReserveStock(items, out error);
     }
 }

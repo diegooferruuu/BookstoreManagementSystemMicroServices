@@ -3,6 +3,7 @@ using MicroServiceProduct.Infraestructure.Repository;
 using MicroServiceProduct.Domain.Services;
 using MicroServiceProduct.Domain.Interfaces;
 using MicroServiceProduct.Application.Services;
+using MicroServiceProduct.Infraestructure.Messaging;
 using System.Reflection;
 using System.IO;
 
@@ -43,6 +44,10 @@ builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 
 // Application services
 builder.Services.AddScoped<IProductService, ProductService>();
+
+// Messaging
+builder.Services.AddSingleton<IEventPublisher, RabbitPublisher>();
+builder.Services.AddHostedService<RabbitConsumerForProduct>();
 
 var app = builder.Build();
 
