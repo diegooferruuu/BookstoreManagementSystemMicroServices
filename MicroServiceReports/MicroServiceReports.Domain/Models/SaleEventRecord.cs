@@ -7,7 +7,7 @@ namespace MicroServiceReports.Domain.Models
         public Guid Id { get; set; }
 
         // Identificador del sale en el sistema de ventas (GUID como string)
-        public string SaleId { get; set; } = string.Empty;
+        public string SaleId { get; set; } = String.Empty;
 
         // Raw JSON payload tal como llegó
         public string Payload { get; set; } = string.Empty;

@@ -95,8 +95,8 @@ builder.Services.AddRazorPages(options =>
 })
 .AddMvcOptions(options =>
 {
-    options.ModelBindingMessageProvider.SetValueMustNotBeNullAccessor(_ => "Debe seleccionar una categor�a.");
-    options.ModelBindingMessageProvider.SetAttemptedValueIsInvalidAccessor((x, y) => "El valor ingresado no es v�lido.");
+    options.ModelBindingMessageProvider.SetValueMustNotBeNullAccessor(_ => "Debe seleccionar una categoría.");
+    options.ModelBindingMessageProvider.SetAttemptedValueIsInvalidAccessor((x, y) => "El valor ingresado no es válido.");
     options.ModelBindingMessageProvider.SetMissingBindRequiredValueAccessor(x => $"Falta el valor para {x}.");
 });
 
@@ -182,7 +182,7 @@ public class StubJwtAuthService : IJwtAuthService
         var result = new ServiceUsers.Application.DTOs.SignInResult();
         if (usr == null || usr.PasswordHash != request.Password)
         {
-            result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "Credentials", Message = "Credenciales inv�lidas" });
+            result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "Credentials", Message = "Credenciales inválidas" });
             return Task.FromResult(result);
         }
         result.Value = new ServiceUsers.Application.DTOs.AuthResponseDto
@@ -197,7 +197,7 @@ public class StubJwtAuthService : IJwtAuthService
             MustChangePassword = usr.MustChangePassword
         };
         if (usr.MustChangePassword)
-            result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "MustChangePassword", Message = "Debe cambiar contrase�a" });
+            result.Errors.Add(new ServiceUsers.Application.DTOs.AuthError { Field = "MustChangePassword", Message = "Debe cambiar contraseña" });
         return Task.FromResult(result);
     }
 }

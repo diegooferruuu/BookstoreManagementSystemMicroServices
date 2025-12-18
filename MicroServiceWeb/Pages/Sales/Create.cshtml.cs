@@ -9,12 +9,14 @@ namespace LibraryWeb.Pages.Sales
         private readonly IClientsApiClient _clients;
         private readonly IProductsApiClient _products;
         private readonly ISalesApiClient _sales;
+        private readonly IConfiguration _configuration;
 
-        public CreateModel(IClientsApiClient clients, IProductsApiClient products, ISalesApiClient sales)
+        public CreateModel(IClientsApiClient clients, IProductsApiClient products, ISalesApiClient sales, IConfiguration configuration)
         {
             _clients = clients;
             _products = products;
             _sales = sales;
+            _configuration = configuration;
         }
 
         // === Propiedades de binding ===
@@ -39,6 +41,10 @@ namespace LibraryWeb.Pages.Sales
         public List<ProductDto> ProductSuggestions { get; set; } = new();
         public decimal Total => Items.Sum(i => i.Total);
         public DateTime Today { get; } = DateTime.Today;
+        
+        // URLs de los microservicios para el JavaScript
+        public string SalesApiUrl => _configuration["Services:Sales"]?.TrimEnd('/') ?? "http://localhost:50400";
+        public string ReportsApiUrl => _configuration["Services:Reports"]?.TrimEnd('/') ?? "http://localhost:7200";
 
         public class SaleItemVm
         {

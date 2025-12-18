@@ -16,6 +16,18 @@ var configuration = builder.Configuration;
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configurar CORS para permitir peticiones desde el frontend
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        builder =>
+        {
+            builder.AllowAnyOrigin()
+                   .AllowAnyMethod()
+                   .AllowAnyHeader();
+        });
+});
+
 // Register RabbitMQ settings
 builder.Services.Configure<RabbitSettings>(configuration.GetSection("RabbitMq"));
 
@@ -24,8 +36,9 @@ var connectionString = configuration.GetConnectionString("MicroServiceReports");
 builder.Services.AddDbContext<MicroServiceReportsDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// Register repository
+// Register repositories
 builder.Services.AddScoped<ISaleEventRepository, SaleEventRepositoryEf>();
+builder.Services.AddScoped<ISaleDetailRepository, SaleDetailRepositoryEf>();
 
 // Register Builder Pattern components for PDF generation
 builder.Services.AddScoped<ISalePdfBuilder, QuestPdfSaleBuilder>();
@@ -47,6 +60,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Usar CORS
+app.UseCors("AllowAll");
 
 app.UseHttpsRedirection();
 

@@ -22,7 +22,7 @@ namespace MicroServiceSales.Infrastructure.Repositories
             using var conn = _database.GetConnection();
             using var cmd = new NpgsqlCommand(@"
                 SELECT id, client_id, user_id, sale_date, subtotal, total, status,
-                       cancelled_at, cancelled_by, created_at
+                       cancellation_reason, cancelled_at, cancelled_by, created_at
                 FROM sales
                 ORDER BY sale_date DESC, created_at DESC", conn);
             using var reader = cmd.ExecuteReader();
@@ -40,7 +40,7 @@ namespace MicroServiceSales.Infrastructure.Repositories
             using var conn = _database.GetConnection();
             using var cmd = new NpgsqlCommand(@"
                 SELECT id, client_id, user_id, sale_date, subtotal, total, status,
-                       cancelled_at, cancelled_by, created_at
+                       cancellation_reason, cancelled_at, cancelled_by, created_at
                 FROM sales WHERE id = @id", conn);
             cmd.Parameters.AddWithValue("@id", NpgsqlDbType.Uuid, id);
 
@@ -77,9 +77,11 @@ namespace MicroServiceSales.Infrastructure.Repositories
             using var conn = _database.GetConnection();
             using var cmd = new NpgsqlCommand(@"
                 INSERT INTO sales (
-                    id, client_id, user_id, sale_date, subtotal, total, status, cancelled_at, cancelled_by
+                    id, client_id, user_id, sale_date, subtotal, total, status, 
+                    cancellation_reason, cancelled_at, cancelled_by
                 ) VALUES (
-                    @id, @client_id, @user_id, @sale_date, @subtotal, @total, @status, @cancelled_at, @cancelled_by
+                    @id, @client_id, @user_id, @sale_date, @subtotal, @total, @status,
+                    @cancellation_reason, @cancelled_at, @cancelled_by
                 )", conn);
 
             cmd.Parameters.AddWithValue("@id", NpgsqlDbType.Uuid, sale.Id);
@@ -89,6 +91,7 @@ namespace MicroServiceSales.Infrastructure.Repositories
             cmd.Parameters.AddWithValue("@subtotal", NpgsqlDbType.Numeric, sale.Subtotal);
             cmd.Parameters.AddWithValue("@total", NpgsqlDbType.Numeric, sale.Total);
             cmd.Parameters.AddWithValue("@status", NpgsqlDbType.Varchar, sale.Status);
+            cmd.Parameters.AddWithValue("@cancellation_reason", NpgsqlDbType.Varchar, (object?)sale.CancellationReason ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@cancelled_at", NpgsqlDbType.TimestampTz, (object?)sale.CancelledAt ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@cancelled_by", NpgsqlDbType.Uuid, (object?)sale.CancelledBy ?? DBNull.Value);
 
@@ -128,6 +131,7 @@ namespace MicroServiceSales.Infrastructure.Repositories
                     subtotal = @subtotal,
                     total = @total,
                     status = @status,
+                    cancellation_reason = @cancellation_reason,
                     cancelled_at = @cancelled_at,
                     cancelled_by = @cancelled_by
                 WHERE id = @id", conn);
@@ -139,6 +143,7 @@ namespace MicroServiceSales.Infrastructure.Repositories
             cmd.Parameters.AddWithValue("@subtotal", NpgsqlDbType.Numeric, sale.Subtotal);
             cmd.Parameters.AddWithValue("@total", NpgsqlDbType.Numeric, sale.Total);
             cmd.Parameters.AddWithValue("@status", NpgsqlDbType.Varchar, sale.Status);
+            cmd.Parameters.AddWithValue("@cancellation_reason", NpgsqlDbType.Varchar, (object?)sale.CancellationReason ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@cancelled_at", NpgsqlDbType.TimestampTz, (object?)sale.CancelledAt ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@cancelled_by", NpgsqlDbType.Uuid, (object?)sale.CancelledBy ?? DBNull.Value);
 
@@ -166,6 +171,10 @@ namespace MicroServiceSales.Infrastructure.Repositories
                 Status = reader.GetString(reader.GetOrdinal("status")),
                 CreatedAt = reader.GetFieldValue<DateTimeOffset>(reader.GetOrdinal("created_at"))
             };
+
+            var cancellationReasonIdx = reader.GetOrdinal("cancellation_reason");
+            if (!reader.IsDBNull(cancellationReasonIdx))
+                sale.CancellationReason = reader.GetString(cancellationReasonIdx);
 
             var cancelledAtIdx = reader.GetOrdinal("cancelled_at");
             if (!reader.IsDBNull(cancelledAtIdx))

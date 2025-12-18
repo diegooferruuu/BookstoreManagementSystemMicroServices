@@ -109,8 +109,8 @@
                 else if (!string.IsNullOrWhiteSpace(Model.ClientSearch))
                 {
                     <div class="alert alert-warning mb-4">
-                        <i class="fas fa-exclamation-triangle me-1"></i>No se encontr� cliente con CI/NIT "<strong>@Model.ClientSearch</strong>". 
-                        Puedes crear uno nuevo con el bot�n <strong>+</strong>.
+                        <i class="fas fa-exclamation-triangle me-1"></i>No se encontró cliente con CI/NIT "<strong>@Model.ClientSearch</strong>". 
+                        Puedes crear uno nuevo con el botón <strong>"+"</strong>.
                     </div>
                 }
             }
@@ -170,7 +170,7 @@
                     <thead>
                         <tr>
                             <th class="th-blue" style="width:160px">Cantidad</th>
-                            <th class="th-blue">Descripci�n</th>
+                            <th class="th-blue">Descripción</th>
                             <th class="th-blue text-end" style="width:140px">P. Unitario</th>
                             <th class="th-blue text-end" style="width:140px">Importe</th>
                             <th class="th-blue text-center" style="width:100px">Quitar</th>
@@ -220,9 +220,9 @@
                 <button type="submit" formaction="?handler=Save" class="btn btn-success btn-lg">
                     <i class="fas fa-save me-1"></i>Guardar Venta
                 </button>
-                <a asp-page="/Sales/Index" class="btn btn-secondary btn-lg">
-                    <i class="fas fa-times me-1"></i>Cancelar
-                </a>
+                    <a asp-page="/Sales/Index" class="btn btn-danger btn-lg">
+                        <i class="fas fa-times me-1 "></i>Cancelar
+                    </a>
             </div>
         </div>
     </div>
@@ -269,12 +269,12 @@
                     <span class="text-danger small" asp-validation-for="NewClient.Email"></span>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Tel�fono *</label>
+                    <label class="form-label">Telófono *</label>
                     <input asp-for="NewClient.Phone" class="form-control" maxlength="8" />
                     <span class="text-danger small" asp-validation-for="NewClient.Phone"></span>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Direcci�n *</label>
+                    <label class="form-label">Dirección *</label>
                     <input asp-for="NewClient.Address" class="form-control" />
                     <span class="text-danger small" asp-validation-for="NewClient.Address"></span>
                 </div>
@@ -392,6 +392,79 @@
             });
         }
     })();
+    
+    // Función para mostrar alertas
+    function showAlert(message, type) {
+        // Remover alertas anteriores del mismo tipo si existen
+        var existingAlerts = document.querySelectorAll('.alert.position-fixed');
+        existingAlerts.forEach(function(alert) {
+            if (type === 'info' || alert.classList.contains('alert-info')) {
+                alert.remove();
+            }
+        });
+        
+        var alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-' + type + ' alert-dismissible fade show position-fixed';
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 350px; max-width: 500px;';
+        var icon = type === 'success' ? 'check-circle' : (type === 'danger' ? 'exclamation-triangle' : 'info-circle');
+        alertDiv.innerHTML = '<i class="fas fa-' + icon + ' me-2"></i>' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        document.body.appendChild(alertDiv);
+        setTimeout(function() { alertDiv.remove(); }, type === 'danger' ? 10000 : 5000);
+    }
+    
+    // Función para verificar el estado de la venta con polling
+    function checkSaleStatus(saleId, maxAttempts, currentAttempt) {
+        console.log('Verificando estado de venta. Intento ' + (currentAttempt + 1) + ' de ' + maxAttempts);
+        
+        if (currentAttempt >= maxAttempts) {
+            showAlert('No se pudo confirmar el estado de la venta. Por favor verifique manualmente en el listado de ventas.', 'warning');
+            return;
+        }
+        
+        // URLs de los microservicios desde el modelo
+        var salesApiUrl = '@Model.SalesApiUrl';
+        var reportsApiUrl = '@Model.ReportsApiUrl';
+        
+        fetch(salesApiUrl + '/api/sales/' + saleId + '/status')
+            .then(function(r) { 
+                console.log('Respuesta del servidor:', r.status);
+                if (!r.ok) {
+                    throw new Error('HTTP ' + r.status);
+                }
+                return r.json(); 
+            })
+            .then(function(data) {
+                console.log('Estado de venta:', data);
+                
+                if (data.status === 'COMPLETED') {
+                    // Venta exitosa - abrir PDF
+                    showAlert('<strong>¡Venta exitosa!</strong> Abriendo comprobante...', 'success');
+                    var pdfUrl = reportsApiUrl + '/api/reports/sale/' + saleId + '/pdf';
+                    setTimeout(function() {
+                        var pdfWindow = window.open(pdfUrl, '_blank');
+                        if (!pdfWindow) {
+                            showAlert('Por favor, habilite las ventanas emergentes para ver el comprobante. <a href="' + pdfUrl + '" target="_blank" class="alert-link">Click aquí para abrir</a>', 'warning');
+                        }
+                    }, 500);
+                } else if (data.status === 'CANCELLED') {
+                    // Venta rechazada - mostrar mensaje de error
+                    showAlert('<strong>Venta cancelada:</strong> ' + (data.message || 'Stock insuficiente para completar la venta.'), 'danger');
+                } else {
+                    // Todavía en proceso - reintentar
+                    console.log('Estado pendiente, reintentando en 1.5 segundos...');
+                    setTimeout(function() {
+                        checkSaleStatus(saleId, maxAttempts, currentAttempt + 1);
+                    }, 1500);
+                }
+            })
+            .catch(function(err) {
+                console.error('Error verificando estado:', err);
+                // Reintentar en caso de error de red
+                setTimeout(function() {
+                    checkSaleStatus(saleId, maxAttempts, currentAttempt + 1);
+                }, 2000);
+            });
+    }
     </script>
 
     @if (TempData["OpenClientModal"] as bool? == true)
@@ -409,32 +482,15 @@
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 var saleId = '@TempData["SaleId"]';
-                // URL directa al servicio de Reports API
-                var pdfUrl = 'http://localhost:7200/api/reports/sale/' + saleId + '/pdf';
                 
-                console.log('Abriendo PDF:', pdfUrl);
+                // Mostrar mensaje de procesamiento
+                showAlert('<i class="fas fa-spinner fa-spin me-2"></i>Procesando venta, por favor espere...', 'info');
                 
-                // Abrir el PDF en una nueva ventana/pestaña
-                var pdfWindow = window.open(pdfUrl, '_blank');
-                
-                if (!pdfWindow) {
-                    alert('Por favor, habilite las ventanas emergentes para ver el comprobante.');
-                }
-                
-                // Mostrar mensaje de éxito
-                @if (TempData["Success"] != null)
-                {
-                    <text>
-                    setTimeout(function() {
-                        var alertDiv = document.createElement('div');
-                        alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
-                        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-                        alertDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i>@TempData["Success"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-                        document.body.appendChild(alertDiv);
-                        setTimeout(function() { alertDiv.remove(); }, 5000);
-                    }, 500);
-                    </text>
-                }
+                // Iniciar polling para verificar el estado de la venta
+                // Esperar 1 segundo antes de empezar para dar tiempo al proceso asíncrono
+                setTimeout(function() {
+                    checkSaleStatus(saleId, 30, 0); // Máximo 30 intentos (45 segundos aprox)
+                }, 1000);
             });
         </script>
     }

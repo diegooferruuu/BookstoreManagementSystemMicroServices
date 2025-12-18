@@ -251,6 +251,27 @@ namespace MicroServiceWeb.External.Http
                 return null;
             }
         }
+
+        public async Task<SaleStatusResult> GetStatusAsync(Guid id, CancellationToken ct)
+        {
+            try
+            {
+                var resp = await _http.GetAsync($"api/sales/{id}/status", ct);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    return new SaleStatusResult { Status = "PENDING", Message = "Verificando estado de la venta..." };
+                }
+
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                return JsonSerializer.Deserialize<SaleStatusResult>(json, options) 
+                    ?? new SaleStatusResult { Status = "PENDING", Message = "Verificando estado de la venta..." };
+            }
+            catch
+            {
+                return new SaleStatusResult { Status = "PENDING", Message = "Verificando estado de la venta..." };
+            }
+        }
     }
 
     public class UsersApiClient : IUsersApiClient
@@ -348,10 +369,10 @@ namespace MicroServiceWeb.External.Http
             {
                 using var doc = JsonDocument.Parse(text);
                 var root = doc.RootElement;
-                var msg = root.TryGetProperty("message", out var m) ? m.GetString() : "Error al cambiar contrase�a.";
+                var msg = root.TryGetProperty("message", out var m) ? m.GetString() : "Error al cambiar contraseña.";
                 return new ApiSimpleResult { Success = false, Error = msg };
             }
-            catch { return new ApiSimpleResult { Success = false, Error = "Error al cambiar contrase�a." }; }
+            catch { return new ApiSimpleResult { Success = false, Error = "Error al cambiar contraseña." }; }
         }
 
         private static async Task<AuthLoginResult> ParseAuthResponse(HttpResponseMessage resp, CancellationToken ct)
@@ -393,9 +414,9 @@ namespace MicroServiceWeb.External.Http
                         {
                             msg = status switch
                             {
-                                System.Net.HttpStatusCode.Unauthorized => "Credenciales inv�lidas o usuario inactivo.",
+                                System.Net.HttpStatusCode.Unauthorized => "Credenciales inválidas o usuario inactivo.",
                                 System.Net.HttpStatusCode.Forbidden => "Acceso denegado.",
-                                _ => "Error al iniciar sesi�n."
+                                _ => "Error al iniciar sesión."
                             };
                         }
                         result.Error = msg;
@@ -414,9 +435,9 @@ namespace MicroServiceWeb.External.Http
                 {
                     result.Error = status switch
                     {
-                        System.Net.HttpStatusCode.Unauthorized => "Credenciales inv�lidas o usuario inactivo.",
+                        System.Net.HttpStatusCode.Unauthorized => "Credenciales inválidas o usuario inactivo.",
                         System.Net.HttpStatusCode.Forbidden => "Acceso denegado.",
-                        _ => "Error en la autenticaci�n."
+                        _ => "Error en la autenticación."
                     };
                 }
             }

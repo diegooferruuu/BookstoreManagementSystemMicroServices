@@ -15,13 +15,14 @@ public interface IProductsApiClient
     Task<ProductApiResult> CreateAsync(ProductCreateDto dto, CancellationToken ct);
     Task<ProductApiResult> UpdateAsync(Guid id, ProductUpdateDto dto, CancellationToken ct);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct);
-    // Categor�as (del mismo microservicio)
+    // categorías (del mismo microservicio)
     Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken ct);
 }
 public interface ISalesApiClient
 {
     Task<SaleApiResult> CreateAsync(SaleCreateDto dto, CancellationToken ct);
     Task<SaleDto?> GetByIdAsync(Guid id, CancellationToken ct);
+    Task<SaleStatusResult> GetStatusAsync(Guid id, CancellationToken ct);
 }
 public interface IUsersApiClient
 {
@@ -110,13 +111,13 @@ public record ProductDto(
 
 public class ProductCreateDto
 {
-    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "M�nimo 3 caracteres."), MaxLength(100, ErrorMessage = "M�ximo 100 caracteres."), Display(Name = "Nombre")]
+    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), Display(Name = "Nombre")]
     public string Name { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "La descripci�n es obligatoria."), MaxLength(500, ErrorMessage = "M�ximo 500 caracteres."), Display(Name = "Descripci�n")]
+    [Required(ErrorMessage = "La descripción es obligatoria."), MaxLength(500, ErrorMessage = "Máximo 500 caracteres."), Display(Name = "Descripción")]
     public string? Description { get; set; }
 
-    [Required(ErrorMessage = "La categor�a es obligatoria."), Display(Name = "Categor�a")]
+    [Required(ErrorMessage = "La categoría es obligatoria."), Display(Name = "Categoría")]
     public Guid? CategoryId { get; set; }
 
     // Campo opcional para ayudar a backends que mantienen columna denormalizada category_name
@@ -148,36 +149,36 @@ public class AuthLoginResult
 }
 public class ChangePasswordRequest
 {
-    [Required(ErrorMessage = "La contrase�a actual es obligatoria.")]
+    [Required(ErrorMessage = "La contraseña actual es obligatoria.")]
     public string CurrentPassword { get; set; } = string.Empty;
-    [Required(ErrorMessage = "La nueva contrase�a es obligatoria."), MinLength(8)]
+    [Required(ErrorMessage = "La nueva contraseña es obligatoria."), MinLength(8)]
     public string NewPassword { get; set; } = string.Empty;
-    [Required, Compare(nameof(NewPassword), ErrorMessage = "Las contrase�as no coinciden.")]
+    [Required, Compare(nameof(NewPassword), ErrorMessage = "Las contraseñas no coinciden.")]
     public string ConfirmPassword { get; set; } = string.Empty;
 }
 public class ApiSimpleResult { public bool Success { get; set; } public string? Error { get; set; } }
-public class UserCreateRequest { [Required(ErrorMessage="El correo es obligatorio."), EmailAddress(ErrorMessage="Correo inv�lido.")] public string Email { get; set; } = string.Empty; [Required(ErrorMessage="El rol es obligatorio.")] public string Role { get; set; } = string.Empty; }
+public class UserCreateRequest { [Required(ErrorMessage="El correo es obligatorio."), EmailAddress(ErrorMessage="Correo inválido.")] public string Email { get; set; } = string.Empty; [Required(ErrorMessage="El rol es obligatorio.")] public string Role { get; set; } = string.Empty; }
 public class UserUpdateRequest { [Required, EmailAddress] public string Email { get; set; } = string.Empty; public List<string> Roles { get; set; } = new(); }
 public class UserApiResult { public bool Success { get; set; } public UserFullDto? User { get; set; } public Dictionary<string, List<string>> Errors { get; set; } = new(); }
 
 public class ClientCreateDto
 {
-    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "M�nimo 3 caracteres."), MaxLength(100, ErrorMessage = "M�ximo 100 caracteres."), RegularExpression(@"^[A-Za-z��������������' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Nombre")] public string FirstName { get; set; } = string.Empty;
-    [Required(ErrorMessage = "El apellido es obligatorio."), MinLength(3, ErrorMessage = "M�nimo 3 caracteres."), MaxLength(100, ErrorMessage = "M�ximo 100 caracteres."), RegularExpression(@"^[A-Za-z��������������' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Apellido")] public string LastName { get; set; } = string.Empty;
-    [Required(ErrorMessage = "El CI es obligatorio."), StringLength(20), RegularExpression(@"^\d{5,10}(-(LP|CB|SC|CH|OR|PT|TJ|BN|PD))?$", ErrorMessage = "CI inv�lido. Ej: 1234567-CB"), Display(Name = "CI")] public string Ci { get; set; } = string.Empty;
-    [Required(ErrorMessage = "El correo electr�nico es obligatorio."), EmailAddress(ErrorMessage = "Correo inv�lido."), MaxLength(150, ErrorMessage = "M�ximo 150 caracteres."), Display(Name = "Correo electr�nico")] public string? Email { get; set; }
-    [Required(ErrorMessage = "El tel�fono es obligatorio."), RegularExpression(@"^\d{8}$", ErrorMessage = "Debe tener 8 d�gitos."), Display(Name = "Tel�fono")] public string? Phone { get; set; }
-    [Required(ErrorMessage = "La direcci�n es obligatoria."), MinLength(5, ErrorMessage = "M�nimo 5 caracteres."), MaxLength(255, ErrorMessage = "M�ximo 255 caracteres."), Display(Name = "Direcci�n")] public string? Address { get; set; }
+    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), RegularExpression(@"^[A-Za-z��������������' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Nombre")] public string FirstName { get; set; } = string.Empty;
+    [Required(ErrorMessage = "El apellido es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(100, ErrorMessage = "Máximo 100 caracteres."), RegularExpression(@"^[A-Za-z��������������' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Apellido")] public string LastName { get; set; } = string.Empty;
+    [Required(ErrorMessage = "El CI es obligatorio."), StringLength(20), RegularExpression(@"^\d{5,10}(-(LP|CB|SC|CH|OR|PT|TJ|BN|PD))?$", ErrorMessage = "CI inválido. Ej: 1234567-CB"), Display(Name = "CI")] public string Ci { get; set; } = string.Empty;
+    [Required(ErrorMessage = "El correo electr�nico es obligatorio."), EmailAddress(ErrorMessage = "Correo inválido."), MaxLength(150, ErrorMessage = "Máximo 150 caracteres."), Display(Name = "Correo electr�nico")] public string? Email { get; set; }
+    [Required(ErrorMessage = "El Telófono es obligatorio."), RegularExpression(@"^\d{8}$", ErrorMessage = "Debe tener 8 d�gitos."), Display(Name = "Telófono")] public string? Phone { get; set; }
+    [Required(ErrorMessage = "La Dirección es obligatoria."), MinLength(5, ErrorMessage = "Mínimo 5 caracteres."), MaxLength(255, ErrorMessage = "Máximo 255 caracteres."), Display(Name = "Dirección")] public string? Address { get; set; }
 }
 public class ClientUpdateDto : ClientCreateDto { }
 public class ClientApiResult { public bool Success { get; set; } public ClientDto? Client { get; set; } public Dictionary<string, List<string>> Errors { get; set; } = new(); }
 
 public class DistributorCreateDto
 {
-    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "M�nimo 3 caracteres."), MaxLength(120, ErrorMessage = "M�ximo 120 caracteres."), RegularExpression(@"^[A-Za-z��������������' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Nombre")] public string Name { get; set; } = string.Empty;
-    [Required(ErrorMessage = "El correo de contacto es obligatorio."), EmailAddress(ErrorMessage = "Correo inv�lido."), Display(Name = "Correo de contacto")] public string? ContactEmail { get; set; }
-    [Required(ErrorMessage = "El tel�fono es obligatorio."), RegularExpression(@"^\d{8}$", ErrorMessage = "Debe tener 8 d�gitos."), Display(Name = "Tel�fono")] public string? Phone { get; set; }
-    [Required(ErrorMessage = "La direcci�n es obligatoria."), MinLength(5, ErrorMessage = "M�nimo 5 caracteres."), MaxLength(255, ErrorMessage = "M�ximo 255 caracteres."), Display(Name = "Direcci�n")] public string? Address { get; set; }
+    [Required(ErrorMessage = "El nombre es obligatorio."), MinLength(3, ErrorMessage = "Mínimo 3 caracteres."), MaxLength(120, ErrorMessage = "Máximo 120 caracteres."), RegularExpression(@"^[A-Za-z��������������' -]+$", ErrorMessage = "Solo letras y espacios."), Display(Name = "Nombre")] public string Name { get; set; } = string.Empty;
+    [Required(ErrorMessage = "El correo de contacto es obligatorio."), EmailAddress(ErrorMessage = "Correo inválido."), Display(Name = "Correo de contacto")] public string? ContactEmail { get; set; }
+    [Required(ErrorMessage = "El Telófono es obligatorio."), RegularExpression(@"^\d{8}$", ErrorMessage = "Debe tener 8 d�gitos."), Display(Name = "Telófono")] public string? Phone { get; set; }
+    [Required(ErrorMessage = "La Dirección es obligatoria."), MinLength(5, ErrorMessage = "Mínimo 5 caracteres."), MaxLength(255, ErrorMessage = "Máximo 255 caracteres."), Display(Name = "Dirección")] public string? Address { get; set; }
 }
 public class DistributorUpdateDto : DistributorCreateDto { }
 public class DistributorApiResult { public bool Success { get; set; } public DistributorDto? Distributor { get; set; } public Dictionary<string, List<string>> Errors { get; set; } = new(); }
@@ -230,5 +231,12 @@ public class SaleApiResult
     public bool Success { get; set; }
     public SaleDto? Sale { get; set; }
     public Dictionary<string, List<string>> Errors { get; set; } = new();
+    public string? Message { get; set; }
+}
+
+// Resultado del estado de la venta
+public class SaleStatusResult
+{
+    public string Status { get; set; } = "PENDING";
     public string? Message { get; set; }
 }
