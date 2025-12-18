@@ -4,6 +4,7 @@ using MicroServiceReports.Infraestructure.Rabbit;
 using MicroServiceReports.Domain.Ports;
 using MicroServiceReports.Application.UseCases;
 using MicroServiceReports.Application.Services;
+using MicroServiceReports.Application.Builders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,7 +27,9 @@ builder.Services.AddDbContext<MicroServiceReportsDbContext>(options =>
 // Register repository
 builder.Services.AddScoped<ISaleEventRepository, SaleEventRepositoryEf>();
 
-// Register PDF generator service
+// Register Builder Pattern components for PDF generation
+builder.Services.AddScoped<ISalePdfBuilder, QuestPdfSaleBuilder>();
+builder.Services.AddScoped<SalePdfDirector>();
 builder.Services.AddScoped<SalePdfGenerator>();
 
 // Register application handlers
