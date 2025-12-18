@@ -25,6 +25,7 @@ def publish_test_sale(sale_id=123):
         "saleId": sale_id,
         "date": datetime.utcnow().isoformat() + "Z",
         "user": "admin",
+        "ci": "12345678",
         "client": "Juan Pérez",
         "total": 350.00,
         "products": [

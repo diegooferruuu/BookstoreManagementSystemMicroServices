@@ -74,6 +74,11 @@ namespace MicroServiceProduct.Infraestructure.Messaging
                 decimal total = root.GetProperty("Total").GetDecimal();
                 DateTimeOffset saleDate = root.GetProperty("SaleDate").GetDateTimeOffset();
                 
+                // Extraer datos de usuario y cliente
+                string? userName = root.TryGetProperty("UserName", out var userNameElem) ? userNameElem.GetString() : null;
+                string? clientName = root.TryGetProperty("ClientName", out var clientNameElem) ? clientNameElem.GetString() : null;
+                string? clientCi = root.TryGetProperty("ClientCi", out var clientCiElem) ? clientCiElem.GetString() : null;
+                
                 var productsElem = root.GetProperty("Products");
                 var items = new Dictionary<Guid, int>();
                 var productsList = new List<object>();
@@ -83,15 +88,39 @@ namespace MicroServiceProduct.Infraestructure.Messaging
                     var pid = product.GetProperty("ProductId").GetGuid();
                     var qty = product.GetProperty("Quantity").GetInt32();
                     var price = product.GetProperty("UnitPrice").GetDecimal();
+                    // Intentar obtener el nombre si viene en el mensaje
+                    string? productName = null;
+                    if (product.TryGetProperty("ProductName", out var nameElem))
+                    {
+                        productName = nameElem.GetString();
+                    }
                     items[pid] = qty;
-                    productsList.Add(new { ProductId = pid, Quantity = qty, UnitPrice = price });
+                    productsList.Add(new { ProductId = pid, ProductName = productName, Quantity = qty, UnitPrice = price });
                 }
 
                 _log.LogInformation("Procesando sales.pending: saleId={saleId} items={count}", saleId, items.Count);
 
                 using var scope = _scopeFactory.CreateScope();
                 var productService = scope.ServiceProvider.GetRequiredService<IProductService>();
+                var productRepo = scope.ServiceProvider.GetRequiredService<IProductRepository>();
                 var publisher = scope.ServiceProvider.GetRequiredService<IEventPublisher>();
+
+                // Enriquecer con nombres de productos desde DB
+                var enrichedProducts = new List<object>();
+                foreach (var item in productsList)
+                {
+                    var itemDict = (dynamic)item;
+                    var pid = itemDict.ProductId;
+                    var product = productRepo.Read(pid);
+                    var name = product?.Name ?? itemDict.ProductName ?? "Unknown";
+                    enrichedProducts.Add(new 
+                    { 
+                        ProductId = itemDict.ProductId, 
+                        ProductName = name,
+                        Quantity = itemDict.Quantity, 
+                        UnitPrice = itemDict.UnitPrice 
+                    });
+                }
 
                 if (productService.TryReserveStock(items, out var error))
                 {
@@ -101,12 +130,15 @@ namespace MicroServiceProduct.Infraestructure.Messaging
                     { 
                         SaleId = saleId,
                         UserId = userId,
+                        UserName = userName,
                         ClientId = clientId,
+                        ClientName = clientName,
+                        ClientCi = clientCi,
                         Subtotal = subtotal,
                         Total = total,
                         SaleDate = saleDate,
                         Status = "APPROVED",
-                        Products = productsList
+                        Products = enrichedProducts
                     });
                 }
                 else
@@ -116,7 +148,10 @@ namespace MicroServiceProduct.Infraestructure.Messaging
                     { 
                         SaleId = saleId,
                         UserId = userId,
+                        UserName = userName,
                         ClientId = clientId,
+                        ClientName = clientName,
+                        ClientCi = clientCi,
                         Subtotal = subtotal,
                         Total = total,
                         SaleDate = saleDate,

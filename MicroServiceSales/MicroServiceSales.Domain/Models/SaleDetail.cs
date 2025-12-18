@@ -16,6 +16,9 @@ namespace MicroServiceSales.Domain.Models
         [Required(ErrorMessage = "El producto es obligatorio.")]
         public Guid ProductId { get; set; }
 
+        [Display(Name = "Nombre del producto")]
+        public string? ProductName { get; set; }
+
         [Display(Name = "Cantidad")]
         [Required(ErrorMessage = "La cantidad es obligatoria.")]
         [Range(1, int.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]

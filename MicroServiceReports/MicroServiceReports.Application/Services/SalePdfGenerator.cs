@@ -16,26 +16,121 @@ namespace MicroServiceReports.Application.Services
             var saleData = JsonDocument.Parse(saleJsonPayload);
             var root = saleData.RootElement;
 
-            // Extraer datos
-            long saleId = root.GetProperty("saleId").GetInt64();
-            DateTime saleDate = root.GetProperty("date").GetDateTime();
-            string user = root.TryGetProperty("user", out var userProp) ? userProp.GetString() ?? "N/A" : "N/A";
-            string client = root.TryGetProperty("client", out var clientProp) ? clientProp.GetString() ?? "N/A" : "N/A";
-            decimal total = root.GetProperty("total").GetDecimal();
+            // Extraer datos (soportar mayúscula y minúscula)
+            long saleId = 0;
+            if (root.TryGetProperty("SaleId", out var saleIdProp))
+            {
+                if (saleIdProp.ValueKind == JsonValueKind.String)
+                {
+                    // GUID como string - convertir a hash
+                    saleId = Math.Abs(saleIdProp.GetString()?.GetHashCode() ?? 0);
+                }
+                else if (saleIdProp.ValueKind == JsonValueKind.Number)
+                {
+                    saleId = saleIdProp.GetInt64();
+                }
+            }
+            else if (root.TryGetProperty("saleId", out var saleIdLower))
+            {
+                saleId = saleIdLower.GetInt64();
+            }
+
+            DateTime saleDate = DateTime.UtcNow;
+            if (root.TryGetProperty("Date", out var dateProp))
+            {
+                saleDate = dateProp.GetDateTime();
+            }
+            else if (root.TryGetProperty("date", out var dateLower))
+            {
+                saleDate = dateLower.GetDateTime();
+            }
+
+            string user = "N/A";
+            if (root.TryGetProperty("User", out var userProp))
+            {
+                user = userProp.GetString() ?? "N/A";
+            }
+            else if (root.TryGetProperty("user", out var userLower))
+            {
+                user = userLower.GetString() ?? "N/A";
+            }
+
+            string ci = "N/A";
+            if (root.TryGetProperty("Ci", out var ciProp))
+            {
+                ci = ciProp.GetString() ?? "N/A";
+            }
+            else if (root.TryGetProperty("ci", out var ciLower))
+            {
+                ci = ciLower.GetString() ?? "N/A";
+            }
+
+            string client = "N/A";
+            if (root.TryGetProperty("Client", out var clientProp))
+            {
+                client = clientProp.GetString() ?? "N/A";
+            }
+            else if (root.TryGetProperty("client", out var clientLower))
+            {
+                client = clientLower.GetString() ?? "N/A";
+            }
+
+            decimal total = 0;
+            if (root.TryGetProperty("Total", out var totalProp))
+            {
+                total = totalProp.GetDecimal();
+            }
+            else if (root.TryGetProperty("total", out var totalLower))
+            {
+                total = totalLower.GetDecimal();
+            }
             
             
             // Productos
             var products = new List<ProductLineItem>();
-            if (root.TryGetProperty("products", out var productsArray))
+            JsonElement productsArray;
+            bool hasProducts = root.TryGetProperty("Products", out productsArray) || root.TryGetProperty("products", out productsArray);
+            
+            if (hasProducts)
             {
                 foreach (var product in productsArray.EnumerateArray())
                 {
+                    string name = "Sin nombre";
+                    if (product.TryGetProperty("Name", out var nameProp))
+                    {
+                        name = nameProp.GetString() ?? "Sin nombre";
+                    }
+                    else if (product.TryGetProperty("name", out var nameLower))
+                    {
+                        name = nameLower.GetString() ?? "Sin nombre";
+                    }
+
+                    int quantity = 0;
+                    if (product.TryGetProperty("Quantity", out var qtyProp))
+                    {
+                        quantity = qtyProp.GetInt32();
+                    }
+                    else if (product.TryGetProperty("quantity", out var qtyLower))
+                    {
+                        quantity = qtyLower.GetInt32();
+                    }
+
+                    decimal unitPrice = 0;
+                    if (product.TryGetProperty("UnitPrice", out var priceProp))
+                    {
+                        unitPrice = priceProp.GetDecimal();
+                    }
+                    else if (product.TryGetProperty("unitPrice", out var priceLower))
+                    {
+                        unitPrice = priceLower.GetDecimal();
+                    }
+
                     products.Add(new ProductLineItem
                     {
-                        Quantity = product.GetProperty("quantity").GetInt32(),
-                        Description = product.GetProperty("name").GetString() ?? "Sin nombre",
-                        UnitPrice = product.GetProperty("unitPrice").GetDecimal(),
-                        Total = product.GetProperty("quantity").GetInt32() * product.GetProperty("unitPrice").GetDecimal()
+                        Quantity = quantity,
+                        Description = name,
+                        UnitPrice = unitPrice,
+                        Total = quantity * unitPrice
                     });
                 }
             }
@@ -49,7 +144,7 @@ namespace MicroServiceReports.Application.Services
                     page.Margin(40);
                     page.DefaultTextStyle(x => x.FontSize(10));
 
-                    page.Header().Element(container => ComposeHeader(container, saleDate, client, saleId));
+                    page.Header().Element(container => ComposeHeader(container, saleDate, client, ci));
                     page.Content().Element(container => ComposeContent(container, products, total));
                     page.Footer().Element(container => ComposeFooter(container, total, receivedAt, user));
                 });
@@ -58,7 +153,7 @@ namespace MicroServiceReports.Application.Services
             return document.GeneratePdf();
         }
 
-        private void ComposeHeader(IContainer container, DateTime saleDate, string client, long saleId)
+        private void ComposeHeader(IContainer container, DateTime saleDate, string client, string ci)
         {
             container.Column(column =>
             {
@@ -87,7 +182,7 @@ namespace MicroServiceReports.Application.Services
 
                 column.Item().Row(row =>
                 {
-                    row.RelativeItem().Text($"CI/NIT: {saleId}").FontSize(11);
+                    row.RelativeItem().Text($"CI/NIT: {ci}").FontSize(11);
                     row.RelativeItem().Text($"Razón Social: {client.ToUpper()}").FontSize(11);
                 });
             });

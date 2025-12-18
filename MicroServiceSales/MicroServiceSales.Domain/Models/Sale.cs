@@ -13,9 +13,18 @@ namespace MicroServiceSales.Domain.Models
         [Required(ErrorMessage = "El cliente es obligatorio.")]
         public Guid ClientId { get; set; }
 
+        [Display(Name = "Nombre del cliente")]
+        public string? ClientName { get; set; }
+
+        [Display(Name = "CI del cliente")]
+        public string? ClientCi { get; set; }
+
         [Display(Name = "Usuario")]
         [Required(ErrorMessage = "El usuario es obligatorio.")]
         public Guid UserId { get; set; }
+
+        [Display(Name = "Nombre del usuario")]
+        public string? UserName { get; set; }
 
         [Display(Name = "Fecha de venta")]
         [Required(ErrorMessage = "La fecha de la venta es obligatoria.")]
@@ -34,19 +43,19 @@ namespace MicroServiceSales.Domain.Models
         [Display(Name = "Estado")]
         [Required(ErrorMessage = "El estado es obligatorio.")]
         [StringLength(20, ErrorMessage = "El estado no debe superar los 20 caracteres.")]
-        [RegularExpression("^(COMPLETED|CANCELLED|PENDING|REFUNDED)$", ErrorMessage = "Estado inválido.")]
+        [RegularExpression("^(COMPLETED|CANCELLED|PENDING|REFUNDED)$", ErrorMessage = "Estado invï¿½lido.")]
         public string Status { get; set; } = "COMPLETED";
 
-        [Display(Name = "Fecha de cancelación")]
+        [Display(Name = "Fecha de cancelaciï¿½n")]
         public DateTimeOffset? CancelledAt { get; set; }
 
         [Display(Name = "Cancelado por")]
         public Guid? CancelledBy { get; set; }
 
-        [Display(Name = "Fecha de creación")]
+        [Display(Name = "Fecha de creaciï¿½n")]
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-        // Detalles de la venta (relación 1..n)
+        // Detalles de la venta (relaciï¿½n 1..n)
         public List<SaleDetail> Details { get; set; } = new List<SaleDetail>();
     }
 }

@@ -14,7 +14,7 @@ namespace MicroServiceReports.Application.UseCases
             _repository = repository;
         }
 
-        public async Task<SaleEventRecord?> HandleAsync(long saleId)
+        public async Task<SaleEventRecord?> HandleAsync(string saleId)
         {
             return await _repository.GetBySaleIdAsync(saleId);
         }

@@ -80,18 +80,32 @@ namespace MicroServiceReports.Infraestructure.Rabbit
         {
             var bodyBytes = ea.Body.ToArray();
             var payload = Encoding.UTF8.GetString(bodyBytes, 0, bodyBytes.Length);
-            long saleId = 0;
+            string saleId = string.Empty;
 
             try
             {
                 using var doc = JsonDocument.Parse(payload);
-                if (doc.RootElement.TryGetProperty("saleId", out var saleIdProp) && saleIdProp.ValueKind == JsonValueKind.Number)
+                // Leer SaleId como string (GUID)
+                if (doc.RootElement.TryGetProperty("SaleId", out var saleIdProp))
                 {
-                    saleId = saleIdProp.GetInt64();
+                    saleId = saleIdProp.GetString() ?? string.Empty;
                 }
-                else
+                // Fallback a minúscula por compatibilidad
+                else if (doc.RootElement.TryGetProperty("saleId", out var saleIdPropLower))
                 {
-                    _logger.LogWarning("Received message without saleId, will nack and not requeue. DeliveryTag={DeliveryTag}", ea.DeliveryTag);
+                    if (saleIdPropLower.ValueKind == JsonValueKind.Number)
+                    {
+                        saleId = saleIdPropLower.GetInt64().ToString();
+                    }
+                    else
+                    {
+                        saleId = saleIdPropLower.GetString() ?? string.Empty;
+                    }
+                }
+                
+                if (string.IsNullOrEmpty(saleId))
+                {
+                    _logger.LogWarning("Received message without valid saleId, will nack and not requeue. DeliveryTag={DeliveryTag}", ea.DeliveryTag);
                     // Permanent bad message - reject without requeue (send to DLX if configured)
                     if (_channel != null) await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
                     return;
@@ -107,13 +121,7 @@ namespace MicroServiceReports.Infraestructure.Rabbit
             try
             {
                 using var scope = _scopeFactory.CreateScope();
-                var repo = scope.ServiceProvider.GetService<ISaleEventRepository>();
-                if (repo == null)
-                {
-                    _logger.LogError("ISaleEventRepository not registered. DeliveryTag={DeliveryTag}", ea.DeliveryTag);
-                    if (_channel != null) await _channel.BasicNackAsync(ea.DeliveryTag, false, true);
-                    return;
-                }
+                var repo = scope.ServiceProvider.GetRequiredService<ISaleEventRepository>();
 
                 var record = new SaleEventRecord
                 {

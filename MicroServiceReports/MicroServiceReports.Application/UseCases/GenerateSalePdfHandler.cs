@@ -14,7 +14,7 @@ namespace MicroServiceReports.Application.UseCases
             _pdfGenerator = pdfGenerator;
         }
 
-        public async Task<byte[]?> HandleAsync(long saleId)
+        public async Task<byte[]?> HandleAsync(string saleId)
         {
             var record = await _repository.GetBySaleIdAsync(saleId);
             

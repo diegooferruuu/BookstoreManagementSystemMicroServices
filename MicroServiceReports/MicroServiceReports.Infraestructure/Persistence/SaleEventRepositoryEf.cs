@@ -21,7 +21,7 @@ namespace MicroServiceReports.Infraestructure.Persistence
             await _dbContext.SaveChangesAsync();
         }
 
-        public async Task<SaleEventRecord?> GetBySaleIdAsync(long saleId)
+        public async Task<SaleEventRecord?> GetBySaleIdAsync(string saleId)
         {
             return await _dbContext.SaleEventRecords.FirstOrDefaultAsync(x => x.SaleId == saleId);
         }

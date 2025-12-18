@@ -61,13 +61,17 @@ namespace MicroServiceSales.Application.Services
                 MessageId = Guid.NewGuid().ToString(),
                 SaleId = sale.Id,
                 UserId = sale.UserId,
+                UserName = sale.UserName,
                 ClientId = sale.ClientId,
+                ClientName = sale.ClientName,
+                ClientCi = sale.ClientCi,
                 Subtotal = sale.Subtotal,
                 Total = sale.Total,
                 SaleDate = sale.SaleDate,
                 Products = (sale.Details ?? new List<SaleDetail>()).Select(d => new
                 {
                     ProductId = d.ProductId,
+                    ProductName = d.ProductName,
                     Quantity = d.Quantity,
                     UnitPrice = d.UnitPrice
                 }).ToList()

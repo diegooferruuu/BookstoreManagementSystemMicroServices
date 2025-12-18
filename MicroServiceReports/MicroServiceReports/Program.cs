@@ -65,7 +65,7 @@ app.MapGet("/api/reports", async (ISaleEventRepository repo) =>
 .WithOpenApi();
 
 // Endpoint para obtener reporte por SaleId
-app.MapGet("/api/reports/sale/{saleId:long}", async (long saleId, GetSaleBySaleIdHandler handler) =>
+app.MapGet("/api/reports/sale/{saleId}", async (string saleId, GetSaleBySaleIdHandler handler) =>
 {
     var record = await handler.HandleAsync(saleId);
     if (record == null)
@@ -87,7 +87,7 @@ app.MapGet("/api/reports/sale/{saleId:long}", async (long saleId, GetSaleBySaleI
 .WithOpenApi();
 
 // Endpoint para generar y visualizar PDF del comprobante de venta
-app.MapGet("/api/reports/sale/{saleId:long}/pdf", async (long saleId, GenerateSalePdfHandler handler, HttpContext context) =>
+app.MapGet("/api/reports/sale/{saleId}/pdf", async (string saleId, GenerateSalePdfHandler handler, HttpContext context) =>
 {
     var pdfBytes = await handler.HandleAsync(saleId);
     

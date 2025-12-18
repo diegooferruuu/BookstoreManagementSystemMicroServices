@@ -84,12 +84,20 @@ namespace MicroServiceSales.Infrastructure.Messaging
                 {
                     if (status == "APPROVED")
                     {
+                        // Extraer datos de usuario y cliente
+                        string? userName = root.TryGetProperty("UserName", out var userNameElem) ? userNameElem.GetString() : null;
+                        string? clientName = root.TryGetProperty("ClientName", out var clientNameElem) ? clientNameElem.GetString() : null;
+                        string? clientCi = root.TryGetProperty("ClientCi", out var clientCiElem) ? clientCiElem.GetString() : null;
+                        
                         // Reconstruir la venta desde el mensaje
                         var sale = new MicroServiceSales.Domain.Models.Sale
                         {
                             Id = saleId,
                             UserId = root.GetProperty("UserId").GetGuid(),
+                            UserName = userName,
                             ClientId = root.GetProperty("ClientId").GetGuid(),
+                            ClientName = clientName,
+                            ClientCi = clientCi,
                             Subtotal = root.GetProperty("Subtotal").GetDecimal(),
                             Total = root.GetProperty("Total").GetDecimal(),
                             SaleDate = root.GetProperty("SaleDate").GetDateTimeOffset(),
@@ -102,11 +110,18 @@ namespace MicroServiceSales.Infrastructure.Messaging
                         var productsElem = root.GetProperty("Products");
                         foreach (var prod in productsElem.EnumerateArray())
                         {
+                            string? productName = null;
+                            if (prod.TryGetProperty("ProductName", out var nameElem))
+                            {
+                                productName = nameElem.GetString();
+                            }
+                            
                             var detail = new MicroServiceSales.Domain.Models.SaleDetail
                             {
                                 Id = Guid.NewGuid(),
                                 SaleId = saleId,
                                 ProductId = prod.GetProperty("ProductId").GetGuid(),
+                                ProductName = productName,
                                 Quantity = prod.GetProperty("Quantity").GetInt32(),
                                 UnitPrice = prod.GetProperty("UnitPrice").GetDecimal(),
                                 Subtotal = prod.GetProperty("UnitPrice").GetDecimal() * prod.GetProperty("Quantity").GetInt32()
@@ -120,21 +135,21 @@ namespace MicroServiceSales.Infrastructure.Messaging
 
                         _log.LogInformation("Venta {saleId} guardada en DB con estado COMPLETED", saleId);
 
-                        // Publicar sales.confirmed para que otros microservicios puedan procesarla
+                        // Publicar sales.confirmed con estructura para Reports
                         await publisher.PublishAsync("sales.confirmed", new
                         {
-                            SaleId = saleId,
-                            UserId = sale.UserId,
-                            ClientId = sale.ClientId,
+                            SaleId = saleId.ToString(),
+                            Date = sale.SaleDate.ToString("o"),
+                            User = userName ?? "Usuario Desconocido",
+                            Ci = clientCi ?? "Sin CI",
+                            Client = clientName ?? "Cliente Desconocido",
                             Total = sale.Total,
-                            Status = "CONFIRMED",
-                            SaleDate = sale.SaleDate,
                             Products = details.Select(d => new
                             {
-                                ProductId = d.ProductId,
+                                ProductId = d.ProductId.ToString(),
+                                Name = d.ProductName ?? "Unknown Product",
                                 Quantity = d.Quantity,
-                                UnitPrice = d.UnitPrice,
-                                Subtotal = d.Subtotal
+                                UnitPrice = d.UnitPrice
                             }).ToList()
                         });
 

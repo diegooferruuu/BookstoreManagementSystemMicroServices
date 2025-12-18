@@ -7,7 +7,7 @@ namespace MicroServiceReports.Domain.Ports
     public interface ISaleEventRepository
     {
         Task SaveAsync(SaleEventRecord record);
-        Task<SaleEventRecord?> GetBySaleIdAsync(long saleId);
+        Task<SaleEventRecord?> GetBySaleIdAsync(string saleId);
         Task<IEnumerable<SaleEventRecord>> GetAllAsync();
     }
 }
