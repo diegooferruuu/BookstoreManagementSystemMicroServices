@@ -13,9 +13,43 @@ namespace MicroServiceWeb.External.Http
     public class ProductsApiClient : IProductsApiClient
     {
         private readonly HttpClient _http;
+        private static readonly JsonSerializerOptions CamelCaseOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
         public ProductsApiClient(IHttpClientFactory f)=>_http=f.CreateClient("ProductsService");
         public async Task<IReadOnlyList<ProductDto>> GetAllAsync(CancellationToken ct)
-            => await _http.GetFromJsonAsync<IReadOnlyList<ProductDto>>("api/products", ct) ?? Array.Empty<ProductDto>();
+        {
+            var resp = await _http.GetAsync("api/products", ct);
+            if (!resp.IsSuccessStatusCode) return Array.Empty<ProductDto>();
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            try
+            {
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var list = JsonSerializer.Deserialize<List<ProductDto>>(json, opts);
+                if (list != null) return list;
+                // Fallback manual parsing
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                var items = new List<ProductDto>();
+                if (root.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in root.EnumerateArray())
+                    {
+                        var id = el.TryGetProperty("id", out var idP) && Guid.TryParse(idP.GetString(), out var gid) ? gid : Guid.Empty;
+                        var name = el.TryGetProperty("name", out var nP) ? nP.GetString() ?? string.Empty : string.Empty;
+                        var desc = el.TryGetProperty("description", out var dP) ? dP.GetString() : null;
+                        Guid catId = Guid.Empty;
+                        if (el.TryGetProperty("categoryId", out var cidP)) Guid.TryParse(cidP.GetString(), out catId);
+                        else if (el.TryGetProperty("category_id", out var cidSnake) && cidSnake.ValueKind == JsonValueKind.String) Guid.TryParse(cidSnake.GetString(), out catId);
+                        var catName = el.TryGetProperty("categoryName", out var cnP) ? cnP.GetString() : (el.TryGetProperty("category_name", out var cnSnake) ? cnSnake.GetString() : null);
+                        var price = el.TryGetProperty("price", out var prP) && prP.TryGetDecimal(out var prVal) ? prVal : 0m;
+                        var stock = el.TryGetProperty("stock", out var stP) && stP.TryGetInt32(out var stVal) ? stVal : 0;
+                        if (id != Guid.Empty)
+                            items.Add(new ProductDto(id, name, desc, catId, catName, price, stock));
+                    }
+                }
+                return items;
+            }
+            catch { return Array.Empty<ProductDto>(); }
+        }
         public async Task<PagedResult<ProductDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct)
         {
             // Llama al endpoint paginado: api/products/paged?page={page}&pageSize={pageSize}
@@ -39,8 +73,22 @@ namespace MicroServiceWeb.External.Http
                     {
                         try 
                         { 
-                            var dto = System.Text.Json.JsonSerializer.Deserialize<ProductDto>(el.GetRawText(), options); 
-                            if (dto != null) items.Add(dto); 
+                            // Deserialización tolerante con snake_case fallback
+                            var dto = System.Text.Json.JsonSerializer.Deserialize<ProductDto>(el.GetRawText(), options);
+                            if (dto == null)
+                            {
+                                var id = el.TryGetProperty("id", out var idP) && Guid.TryParse(idP.GetString(), out var gid) ? gid : Guid.Empty;
+                                var name = el.TryGetProperty("name", out var nP) ? nP.GetString() ?? string.Empty : string.Empty;
+                                var desc = el.TryGetProperty("description", out var dP) ? dP.GetString() : null;
+                                Guid catId = Guid.Empty;
+                                if (el.TryGetProperty("categoryId", out var cidP)) Guid.TryParse(cidP.GetString(), out catId);
+                                else if (el.TryGetProperty("category_id", out var cidSnake) && cidSnake.ValueKind == JsonValueKind.String) Guid.TryParse(cidSnake.GetString(), out catId);
+                                var catName = el.TryGetProperty("categoryName", out var cnP) ? cnP.GetString() : (el.TryGetProperty("category_name", out var cnSnake) ? cnSnake.GetString() : null);
+                                var price = el.TryGetProperty("price", out var prP) && prP.TryGetDecimal(out var prVal) ? prVal : 0m;
+                                var stock = el.TryGetProperty("stock", out var stP) && stP.TryGetInt32(out var stVal) ? stVal : 0;
+                                dto = new ProductDto(id, name, desc, catId, catName, price, stock);
+                            }
+                            items.Add(dto);
                         } 
                         catch { }
                     }
@@ -57,15 +105,44 @@ namespace MicroServiceWeb.External.Http
             }
         }
         public async Task<ProductDto?> GetByIdAsync(Guid id, CancellationToken ct)
-            => await _http.GetFromJsonAsync<ProductDto>($"api/products/{id}", ct);
+        {
+            var resp = await _http.GetAsync($"api/products/{id}", ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            try
+            {
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var dto = JsonSerializer.Deserialize<ProductDto>(json, opts);
+                if (dto != null) return dto;
+                using var doc = JsonDocument.Parse(json);
+                var el = doc.RootElement;
+                if (el.ValueKind != JsonValueKind.Object) return null;
+                var pid = el.TryGetProperty("id", out var idP) && Guid.TryParse(idP.GetString(), out var gid) ? gid : Guid.Empty;
+                var name = el.TryGetProperty("name", out var nP) ? nP.GetString() ?? string.Empty : string.Empty;
+                var desc = el.TryGetProperty("description", out var dP) ? dP.GetString() : null;
+                Guid catId = Guid.Empty;
+                if (el.TryGetProperty("categoryId", out var cidP)) Guid.TryParse(cidP.GetString(), out catId);
+                else if (el.TryGetProperty("category_id", out var cidSnake) && cidSnake.ValueKind == JsonValueKind.String) Guid.TryParse(cidSnake.GetString(), out catId);
+                var catName = el.TryGetProperty("categoryName", out var cnP) ? cnP.GetString() : (el.TryGetProperty("category_name", out var cnSnake) ? cnSnake.GetString() : null);
+                var price = el.TryGetProperty("price", out var prP) && prP.TryGetDecimal(out var prVal) ? prVal : 0m;
+                var stock = el.TryGetProperty("stock", out var stP) && stP.TryGetInt32(out var stVal) ? stVal : 0;
+                return pid == Guid.Empty ? null : new ProductDto(pid, name, desc, catId, catName, price, stock);
+            }
+            catch { return null; }
+        }
         public async Task<ProductApiResult> CreateAsync(ProductCreateDto dto, CancellationToken ct)
-        { var resp = await _http.PostAsJsonAsync("api/products", dto, ct); return await ParseProductResult(resp, ct); }
+        { var resp = await _http.PostAsJsonAsync("api/products", dto, CamelCaseOptions, ct); return await ParseProductResult(resp, ct); }
         public async Task<ProductApiResult> UpdateAsync(Guid id, ProductUpdateDto dto, CancellationToken ct)
-        { var resp = await _http.PutAsJsonAsync($"api/products/{id}", dto, ct); return await ParseProductResult(resp, ct); }
+        { var resp = await _http.PutAsJsonAsync($"api/products/{id}", dto, CamelCaseOptions, ct); return await ParseProductResult(resp, ct); }
         public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
         { var resp = await _http.DeleteAsync($"api/products/{id}", ct); return resp.IsSuccessStatusCode; }
         public async Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken ct)
-            => await _http.GetFromJsonAsync<IReadOnlyList<CategoryDto>>("api/categories", ct) ?? Array.Empty<CategoryDto>();
+        {
+            var resp = await _http.GetAsync("api/categories", ct);
+            if (!resp.IsSuccessStatusCode) return Array.Empty<CategoryDto>();
+            try { return await resp.Content.ReadFromJsonAsync<IReadOnlyList<CategoryDto>>(cancellationToken: ct) ?? Array.Empty<CategoryDto>(); }
+            catch { return Array.Empty<CategoryDto>(); }
+        }
         private static async Task<ProductApiResult> ParseProductResult(HttpResponseMessage resp, CancellationToken ct)
         {
             var result = new ProductApiResult { Success = resp.IsSuccessStatusCode };
@@ -101,9 +178,24 @@ namespace MicroServiceWeb.External.Http
     {
         private readonly HttpClient _http;
         public UsersApiClient(IHttpClientFactory factory) => _http = factory.CreateClient("UsersService");
-        public async Task<UserDto?> GetByIdAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<UserDto>($"api/User/{id}", ct);
-        public async Task<IReadOnlyList<UserDto>> GetAllAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<UserDto>>("api/User", ct) ?? Array.Empty<UserDto>();
-        public async Task<IReadOnlyList<UserFullDto>> GetAllRawAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<UserFullDto>>("api/User", ct) ?? Array.Empty<UserFullDto>();
+        public async Task<UserDto?> GetByIdAsync(Guid id, CancellationToken ct)
+        {
+            var resp = await _http.GetAsync($"api/User/{id}", ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            try { return await resp.Content.ReadFromJsonAsync<UserDto>(cancellationToken: ct); } catch { return null; }
+        }
+        public async Task<IReadOnlyList<UserDto>> GetAllAsync(CancellationToken ct)
+        {
+            var resp = await _http.GetAsync("api/User", ct);
+            if (!resp.IsSuccessStatusCode) return Array.Empty<UserDto>();
+            try { return await resp.Content.ReadFromJsonAsync<IReadOnlyList<UserDto>>(cancellationToken: ct) ?? Array.Empty<UserDto>(); } catch { return Array.Empty<UserDto>(); }
+        }
+        public async Task<IReadOnlyList<UserFullDto>> GetAllRawAsync(CancellationToken ct)
+        {
+            var resp = await _http.GetAsync("api/User", ct);
+            if (!resp.IsSuccessStatusCode) return Array.Empty<UserFullDto>();
+            try { return await resp.Content.ReadFromJsonAsync<IReadOnlyList<UserFullDto>>(cancellationToken: ct) ?? Array.Empty<UserFullDto>(); } catch { return Array.Empty<UserFullDto>(); }
+        }
         public async Task<PagedResult<UserFullDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct)
         {
             var url = $"api/User/paged?page={page}&pageSize={pageSize}";
@@ -147,8 +239,18 @@ namespace MicroServiceWeb.External.Http
                 return new PagedResult<UserFullDto>(new List<UserFullDto>(), page, pageSize, 0, 0);
             }
         }
-        public async Task<IReadOnlyList<string>> GetRolesAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<string>>($"api/User/{id}/roles", ct) ?? Array.Empty<string>();
-        public async Task<UserFullDto?> SearchAsync(string userOrEmail, CancellationToken ct) => await _http.GetFromJsonAsync<UserFullDto>($"api/User/search/{Uri.EscapeDataString(userOrEmail)}", ct);
+        public async Task<IReadOnlyList<string>> GetRolesAsync(Guid id, CancellationToken ct)
+        {
+            var resp = await _http.GetAsync($"api/User/{id}/roles", ct);
+            if (!resp.IsSuccessStatusCode) return Array.Empty<string>();
+            try { return await resp.Content.ReadFromJsonAsync<IReadOnlyList<string>>(cancellationToken: ct) ?? Array.Empty<string>(); } catch { return Array.Empty<string>(); }
+        }
+        public async Task<UserFullDto?> SearchAsync(string userOrEmail, CancellationToken ct)
+        {
+            var resp = await _http.GetAsync($"api/User/search/{Uri.EscapeDataString(userOrEmail)}", ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            try { return await resp.Content.ReadFromJsonAsync<UserFullDto>(cancellationToken: ct); } catch { return null; }
+        }
         public async Task<AuthLoginResult> LoginAsync(AuthLoginRequest request, CancellationToken ct) { var resp = await _http.PostAsJsonAsync("api/Auth/login", request, ct); return await ParseAuthResponse(resp, ct); }
         public async Task<UserApiResult> CreateAsync(UserCreateRequest dto, CancellationToken ct) { var resp = await _http.PostAsJsonAsync("api/User", dto, ct); return await ParseUserResult(resp, ct); }
         public async Task<UserApiResult> RegisterAsync(UserCreateRequest dto, CancellationToken ct) { var resp = await _http.PostAsJsonAsync("api/Auth/register", dto, ct); return await ParseUserResult(resp, ct); }
@@ -281,8 +383,30 @@ namespace MicroServiceWeb.External.Http
     public class ClientsApiClient : IClientsApiClient
     {
         private readonly HttpClient _http; public ClientsApiClient(IHttpClientFactory f)=>_http=f.CreateClient("ClientsService");
-        public async Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<ClientDto>($"api/Client/{id}", ct);
-        public async Task<IReadOnlyList<ClientDto>> GetAllAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<ClientDto>>("api/Client", ct) ?? Array.Empty<ClientDto>();
+
+        public async Task<ClientDto?> GetByCiAsync(string ci, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(ci)) return null;
+            var url = $"api/Client/by-ci/{Uri.EscapeDataString(ci)}";
+            var resp = await _http.GetAsync(url, ct);
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+            if (!resp.IsSuccessStatusCode) return null;
+            try { return await resp.Content.ReadFromJsonAsync<ClientDto>(cancellationToken: ct); } catch { return null; }
+        }
+
+        public async Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct)
+        {
+            var resp = await _http.GetAsync($"api/Client/{id}", ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            try { return await resp.Content.ReadFromJsonAsync<ClientDto>(cancellationToken: ct); } catch { return null; }
+        }
+        public async Task<IReadOnlyList<ClientDto>> GetAllAsync(CancellationToken ct)
+        {
+            var resp = await _http.GetAsync("api/Client", ct);
+            if (!resp.IsSuccessStatusCode) return Array.Empty<ClientDto>();
+            try { return (await resp.Content.ReadFromJsonAsync<List<ClientDto>>(cancellationToken: ct)) ?? new List<ClientDto>(); }
+            catch { return Array.Empty<ClientDto>(); }
+        }
         public async Task<PagedResult<ClientDto>> GetPagedAsync(int page, int pageSize, CancellationToken ct)
         {
             var url = $"api/Client/paged?page={page}&pageSize={pageSize}";
@@ -303,6 +427,17 @@ namespace MicroServiceWeb.External.Http
                         try
                         {
                             var dto = System.Text.Json.JsonSerializer.Deserialize<ClientDto>(el.GetRawText(), options);
+                            if (dto == null)
+                            {
+                                var id = el.TryGetProperty("id", out var idP) && Guid.TryParse(idP.GetString(), out var gid) ? gid : Guid.Empty;
+                                var firstName = el.TryGetProperty("firstName", out var fnP) ? fnP.GetString() ?? string.Empty : string.Empty;
+                                var lastName = el.TryGetProperty("lastName", out var lnP) ? lnP.GetString() ?? string.Empty : string.Empty;
+                                var ci = el.TryGetProperty("ci", out var ciP) ? (ciP.GetString() ?? string.Empty) : string.Empty;
+                                var email = el.TryGetProperty("email", out var emP) ? emP.GetString() : null;
+                                var phone = el.TryGetProperty("phone", out var phP) ? phP.GetString() : null;
+                                var address = el.TryGetProperty("address", out var adP) ? adP.GetString() : null;
+                                dto = new ClientDto(id, firstName, lastName, ci, email, phone, address);
+                            }
                             if (dto != null) items.Add(dto);
                         }
                         catch { }
@@ -357,8 +492,18 @@ namespace MicroServiceWeb.External.Http
     {
         private readonly HttpClient _http;
         public DistributorsApiClient(IHttpClientFactory factory) => _http = factory.CreateClient("DistributorsService");
-        public async Task<DistributorDto?> GetByIdAsync(Guid id, CancellationToken ct) => await _http.GetFromJsonAsync<DistributorDto>($"api/distributors/{id}", ct);
-        public async Task<IReadOnlyList<DistributorDto>> GetAllAsync(CancellationToken ct) => await _http.GetFromJsonAsync<IReadOnlyList<DistributorDto>>("api/distributors", ct) ?? Array.Empty<DistributorDto>();
+        public async Task<DistributorDto?> GetByIdAsync(Guid id, CancellationToken ct)
+        {
+            var resp = await _http.GetAsync($"api/distributors/{id}", ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            try { return await resp.Content.ReadFromJsonAsync<DistributorDto>(cancellationToken: ct); } catch { return null; }
+        }
+        public async Task<IReadOnlyList<DistributorDto>> GetAllAsync(CancellationToken ct)
+        {
+            var resp = await _http.GetAsync("api/distributors", ct);
+            if (!resp.IsSuccessStatusCode) return Array.Empty<DistributorDto>();
+            try { return await resp.Content.ReadFromJsonAsync<IReadOnlyList<DistributorDto>>(cancellationToken: ct) ?? Array.Empty<DistributorDto>(); } catch { return Array.Empty<DistributorDto>(); }
+        }
         public async Task<PagedResult<DistributorDto>> GetPagedAsync(int? page_parameter, int? pageSize_parameter, CancellationToken ct)
         {
             var page = page_parameter ?? 1;

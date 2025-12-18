@@ -14,9 +14,11 @@ namespace MicroServiceClient.Domain.Validations
         private const int LastNameMaxLength = 100;
         private const int EmailMaxLength = 150;
         private const int AddressMaxLength = 200;
+        private const int CiMaxLength = 20;
 
         public static void Normalize(Client c)
         {
+            c.Ci = TextRules.NormalizeCi(c.Ci);
             c.FirstName = TextRules.CanonicalPersonName(c.FirstName);
             c.LastName = TextRules.CanonicalPersonName(c.LastName);
             c.Email = c.Email?.Trim().ToLowerInvariant() ?? string.Empty;
@@ -26,6 +28,14 @@ namespace MicroServiceClient.Domain.Validations
 
         public static IEnumerable<ValidationError> Validate(Client c)
         {
+            var ci = TextRules.NormalizeSpaces(c.Ci).ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(ci))
+                yield return new ValidationError(nameof(c.Ci), "El CI es obligatorio.");
+            else if (ci.Length > CiMaxLength)
+                yield return new ValidationError(nameof(c.Ci), $"El CI no debe superar {CiMaxLength} caracteres.");
+            else if (!TextRules.IsValidBoliviaCi(ci))
+                yield return new ValidationError(nameof(c.Ci), "El CI debe contener solo números y una extensión válida opcional (p. ej. 1234567-CB).");
+
             var first = TextRules.NormalizeSpaces(c.FirstName);
             if (string.IsNullOrWhiteSpace(first))
                 yield return new ValidationError(nameof(c.FirstName), "El nombre es obligatorio.");

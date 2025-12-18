@@ -48,6 +48,9 @@
 
     if ($.validator.unobtrusive && $.validator.unobtrusive.adapters) {
         $.validator.unobtrusive.adapters.addSingleVal("range", "min");
+        // Adapters para atributos personalizados
+        $.validator.unobtrusive.adapters.addBool("productname");
+        $.validator.unobtrusive.adapters.addBool("productdesc");
     }
 
     var letters = "A-Za-zÁÉÍÓÚÑáéíóúÜüñ";
@@ -55,7 +58,8 @@
     $.validator.addMethod("productname", function (value, element) {
         var v = (value || "").trim();
         if (!v) return false;
-        var reAll = new RegExp("^["+letters+"0-9. ]+$");
+        // Permitir letras, números, espacios, puntos, guiones y símbolos º ° ª
+        var reAll = new RegExp("^["+letters+"0-9 .\-º°ª]+$");
         if (!reAll.test(v)) return false;
         var connectors = ["de","del","para","con","y","en","por","la","las","los","san","santa"]; 
         var units = ["gr","g","kg","ml","l","cm","mm","m"]; 
@@ -64,11 +68,12 @@
         for (var i=0;i<tokens.length;i++){
             var t = tokens[i].trim();
             if (!t) continue;
+            if (/^N[º°ª]\d*$/i.test(t)) continue; // N°, Nº, Nª con número opcional
             if (connectors.indexOf(t.toLowerCase()) >= 0) continue;
             if (t.indexOf('.') !== -1 && t.lastIndexOf('.') !== t.length-1) return false;
             var unit = t.endsWith('.') ? t.substring(0,t.length-1) : t;
             if (units.indexOf(unit.toLowerCase()) >= 0) continue;
-            if (/^\d+$/.test(unit)) continue;
+            if (/^[-]?\d+$/.test(unit)) continue; // números sueltos permitidos como parte
             var reLetters = new RegExp("^["+letters+"]+$");
             if (reLetters.test(unit)){
                 if (unit.length < 3) return false; else { hasMain = true; continue; }
@@ -80,17 +85,18 @@
         return hasMain;
     }, function () {
         return [
-            "Solo letras y números.",
-            "Mínimo 3 letras por palabra.",
-            "Solo puntos y no otros caracteres especiales.",
-            "Incluya al menos una palabra con 3 letras."
+            "Solo letras, números, espacios, guiones y puntos.",
+            "Mínimo 3 letras en alguna palabra.",
+            "Soporta unidades como gr., kg., ml. y N°/Nº/Nª.",
+            "Evite caracteres especiales." 
         ].join(' ');
     });
 
     $.validator.addMethod("productdesc", function (value, element) {
         var v = (value || "").trim();
         if (!v) return false;
-        var reAll = new RegExp("^["+letters+"0-9 ,.]+$");
+        // Permitir letras, números, espacios, coma, punto y guion
+        var reAll = new RegExp("^["+letters+"0-9 ,.\-]+$");
         if (!reAll.test(v)) return false;
         var connectors = ["de","del","la","las","los","y","en","para","por","con"]; 
         var tokens = v.replace(/\s+/g,' ').split(' ');
@@ -98,9 +104,10 @@
         for (var i=0;i<tokens.length;i++){
             var raw = tokens[i].trim();
             if (!raw) continue;
+            if (/^N[º°ª]\d*$/i.test(raw)) continue;
             var t = raw.replace(/[.,]$/,'')
             if (connectors.indexOf(t.toLowerCase()) >= 0) { continue; }
-            if (/^\d+$/.test(t)) { continue; }
+            if (/^[-]?\d+$/.test(t)) { continue; }
             var reLetters = new RegExp("^["+letters+"]+$");
             if (reLetters.test(t)){
                 if (t.length < 2) return false;
@@ -113,9 +120,8 @@
         return hasWord;
     }, function(){
         return [
-            "Solo letras y números.",
-            "Permite puntos y comas.",
-            "Incluya al menos una palabra."
+            "Solo letras, números, espacios, guiones, puntos y comas.",
+            "Incluya al menos una palabra." 
         ].join(' ');
     });
 
@@ -148,3 +154,53 @@
     });
 
 })(jQuery);
+
+// Autocompletar simple para ventas (opcional - funciona sin esto)
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        var input = document.getElementById('clientSearchInput');
+        var list = document.getElementById('clientSuggestions');
+        if (!input || !list) return;
+
+        var timer;
+        function clearList() { list.innerHTML = ''; }
+
+        function render(items) {
+            clearList();
+            if (!items || items.length === 0) return;
+            items.forEach(function(it) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'list-group-item list-group-item-action py-2';
+                btn.innerHTML = '<strong>' + it.ci + '</strong> - ' + it.name;
+                btn.addEventListener('click', function () {
+                    input.value = it.ci;
+                    clearList();
+                    // Enviar form para buscar/seleccionar
+                    var form = document.getElementById('mainSaleForm');
+                    if (form) {
+                        form.action = '?handler=SearchClient';
+                        form.submit();
+                    }
+                });
+                list.appendChild(btn);
+            });
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            var term = (input.value || '').trim();
+            if (term.length < 2) { clearList(); return; }
+            timer = setTimeout(function () {
+                fetch(window.location.pathname + '?handler=ClientSuggestions&term=' + encodeURIComponent(term))
+                    .then(function (r) { return r.ok ? r.json() : []; })
+                    .then(render)
+                    .catch(clearList);
+            }, 250);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (e.target !== input && !list.contains(e.target)) clearList();
+        });
+    });
+})();

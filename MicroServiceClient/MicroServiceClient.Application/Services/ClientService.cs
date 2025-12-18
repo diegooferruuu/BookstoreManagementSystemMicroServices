@@ -26,9 +26,19 @@ namespace MicroServiceClient.Application.Services
 
         public Client? Read(Guid id) => _repository.Read(id);
 
+        public Task<Client?> GetByCiAsync(string ci, CancellationToken ct = default)
+        {
+            var normalized = TextRules.NormalizeCi(ci);
+            return _repository.GetByCiAsync(normalized, ct);
+        }
+
         public void Create(Client client)
         {
             var errors = ClientValidation.Validate(client).ToList();
+
+            if (_repository.ExistsByCi(client.Ci))
+                errors.Add(new ValidationError(nameof(client.Ci), "El CI ya está registrado."));
+
             if (errors.Any())
                 throw new ValidationException(errors);
 
@@ -39,6 +49,10 @@ namespace MicroServiceClient.Application.Services
         public void Update(Client client)
         {
             var errors = ClientValidation.Validate(client).ToList();
+
+            if (_repository.ExistsByCi(client.Ci, client.Id))
+                errors.Add(new ValidationError(nameof(client.Ci), "El CI ya está registrado."));
+
             if (errors.Any())
                 throw new ValidationException(errors);
 

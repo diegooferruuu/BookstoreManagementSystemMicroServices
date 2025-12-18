@@ -25,12 +25,15 @@ CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 builder.Services.Configure<RequestLocalizationOptions>(options => { options.DefaultRequestCulture = new RequestCulture(cultureInfo); });
 
 // === Registro de HttpClients para microservicios ===
-builder.Services.AddHttpClient("ProductsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Products"] ?? "https://localhost:57307/"));
+builder.Services.AddHttpClient("ProductsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Products"] ?? "https://localhost:57307/"))
+                .AddHttpMessageHandler<AuthHeaderHandler>();
 builder.Services.AddHttpClient("SalesService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Sales"] ?? "https://placeholder-sales"));
 builder.Services.AddHttpClient("UsersService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Users"] ?? "https://placeholder-users"))
                 .AddHttpMessageHandler<AuthHeaderHandler>();
-builder.Services.AddHttpClient("ClientsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Clients"] ?? "https://placeholder-clients"));
-builder.Services.AddHttpClient("DistributorsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Distributors"] ?? "https://localhost:62293/"));
+builder.Services.AddHttpClient("ClientsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Clients"] ?? "https://placeholder-clients"))
+                .AddHttpMessageHandler<AuthHeaderHandler>();
+builder.Services.AddHttpClient("DistributorsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Distributors"] ?? "https://localhost:62293/"))
+                .AddHttpMessageHandler<AuthHeaderHandler>();
 
 builder.Services.AddTransient<IProductsApiClient, ProductsApiClient>();
 builder.Services.AddTransient<ISalesApiClient, SalesApiClient>();
@@ -86,6 +89,8 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizePage("/Users/ChangePassword", "AdminOrEmployee");
     options.Conventions.AuthorizePage("/Index", "AdminOrEmployee");
     options.Conventions.AuthorizePage("/Error", "AdminOrEmployee");
+    options.Conventions.AuthorizeFolder("/Sales", "AdminOrEmployee");
+    options.Conventions.AuthorizePage("/Sales/Create", "AdminOrEmployee");
 })
 .AddMvcOptions(options =>
 {

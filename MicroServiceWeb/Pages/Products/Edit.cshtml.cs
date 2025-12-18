@@ -50,19 +50,28 @@ namespace LibraryWeb.Pages.Products
                 Name = product.Name,
                 Description = product.Description,
                 CategoryId = product.CategoryId,
+                CategoryName = product.CategoryName,
                 Price = product.Price,
                 Stock = product.Stock
             };
-            await LoadCategoriesAsync(product.CategoryId, ct);
+            await LoadCategoriesAsync(product.CategoryId, product.CategoryName, ct);
             TempData["EditProductId"] = id; // preservar para POST
             return Page();
         }
 
         public async Task<IActionResult> OnPostAsync(CancellationToken ct)
         {
+            // Asegurar que enviamos CategoryName coherente con el CategoryId seleccionado
+            if (Product.CategoryId.HasValue)
+            {
+                var cats = await _api.GetCategoriesAsync(ct);
+                var c = cats.FirstOrDefault(x => x.Id == Product.CategoryId.Value);
+                Product.CategoryName = c?.Name;
+            }
+
             if (!ModelState.IsValid)
             {
-                await LoadCategoriesAsync(Product.CategoryId ?? Guid.Empty, ct);
+                await LoadCategoriesAsync(Product.CategoryId ?? Guid.Empty, Product.CategoryName, ct);
                 return Page();
             }
 
@@ -90,22 +99,31 @@ namespace LibraryWeb.Pages.Products
                     foreach (var msg in kv.Value) ModelState.AddModelError(key, msg);
                 }
                 if (result.Errors.Count == 0) ModelState.AddModelError(string.Empty, "No se pudo actualizar el producto.");
-                await LoadCategoriesAsync(Product.CategoryId ?? Guid.Empty, ct);
+                await LoadCategoriesAsync(Product.CategoryId ?? Guid.Empty, Product.CategoryName, ct);
                 TempData["EditProductId"] = id; // mantener
                 return Page();
             }
             return RedirectToPage("Index");
         }
 
-        private async Task LoadCategoriesAsync(Guid selected, CancellationToken ct)
+        private async Task LoadCategoriesAsync(Guid selected, string? selectedName, CancellationToken ct)
         {
             var categories = await _api.GetCategoriesAsync(ct);
             Categories = categories.Select(c => new SelectListItem
             {
                 Value = c.Id.ToString(),
                 Text = c.Name,
-                Selected = c.Id == selected
             }).ToList();
+
+            // Si la categoría actual del producto no está entre las activas, la insertamos para mantener selección correcta
+            if (selected != Guid.Empty && !Categories.Any(x => Guid.TryParse(x.Value, out var id) && id == selected))
+            {
+                Categories.Insert(0, new SelectListItem
+                {
+                    Value = selected.ToString(),
+                    Text = selectedName ?? "(Categoría actual no disponible)",
+                });
+            }
         }
     }
 }

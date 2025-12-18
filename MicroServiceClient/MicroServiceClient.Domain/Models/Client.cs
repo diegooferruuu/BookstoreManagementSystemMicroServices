@@ -12,6 +12,11 @@ namespace MicroServiceClient.Domain.Models
         [Key]
         public Guid Id { get; set; }
 
+        [Display(Name = "CI")]
+        [Required(ErrorMessage = "El CI es obligatorio.")]
+        [StringLength(20, ErrorMessage = "El CI no debe superar los 20 caracteres.")]
+        public string Ci { get; set; } = string.Empty;
+
         [Display(Name = "Nombre")]
         [Required(ErrorMessage = "El nombre es obligatorio.")]
         [RegularExpression(@"^[A-Za-zÁÉÍÓÚáéíóúÑñ]+$", ErrorMessage = "El nombre solo puede contener letras, sin espacios.")]

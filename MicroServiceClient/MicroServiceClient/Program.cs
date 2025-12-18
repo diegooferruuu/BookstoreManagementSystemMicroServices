@@ -3,6 +3,7 @@ using MicroServiceClient.Application.Services;
 using MicroServiceClient.Infrastructure.DataBase;
 using MicroServiceClient.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -19,7 +20,7 @@ builder.Services.AddSingleton<IDataBase>(sp => DataBaseConnection.GetInstance(co
 builder.Services.AddScoped<IClientRepository, ClientRepository>();
 builder.Services.AddScoped<IClientService, ClientService>();
 
-// Autenticación JWT
+// Autenticación JWT (HS256) estricta alineada con Users
 builder.Services
     .AddAuthentication(options =>
     {
@@ -29,17 +30,32 @@ builder.Services
     .AddJwtBearer(options =>
     {
         var jwt = builder.Configuration.GetSection("Jwt");
+        var issuer = jwt["Issuer"] ?? throw new InvalidOperationException("Jwt:Issuer no configurado");
+        var audience = jwt["Audience"] ?? throw new InvalidOperationException("Jwt:Audience no configurado");
+        var key = jwt["Key"] ?? throw new InvalidOperationException("Jwt:Key no configurado");
+
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwt["Issuer"],
-            ValidAudience = jwt["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"] ?? string.Empty))
+            ValidIssuer = issuer,
+            ValidAudience = audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
+            ClockSkew = TimeSpan.Zero
         };
     });
+
+// Autorización por defecto: requiere usuario autenticado para todo
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

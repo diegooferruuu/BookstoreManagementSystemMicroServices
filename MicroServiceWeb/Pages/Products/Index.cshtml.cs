@@ -33,6 +33,21 @@ namespace LibraryWeb.Pages.Products
             // Asegurar que backend corrige page/pageSize si salen de rango
             Page = paged.Page; PageSize = paged.PageSize; TotalItems = paged.TotalItems;
             Products = paged.Items.ToList();
+
+            // Fallback UI: si vienen productos sin CategoryName, completar desde /api/categories
+            if (Products.Any(p => p.CategoryId != Guid.Empty && string.IsNullOrWhiteSpace(p.CategoryName)))
+            {
+                var cats = await _api.GetCategoriesAsync(ct);
+                var dict = cats.ToDictionary(c => c.Id, c => c.Name);
+                for (int i = 0; i < Products.Count; i++)
+                {
+                    var p = Products[i];
+                    if (p.CategoryId != Guid.Empty && string.IsNullOrWhiteSpace(p.CategoryName) && dict.TryGetValue(p.CategoryId, out var name))
+                    {
+                        Products[i] = new ProductDto(p.Id, p.Name, p.Description, p.CategoryId, name, p.Price, p.Stock);
+                    }
+                }
+            }
         }
 
         public IActionResult OnPostEdit(Guid id)

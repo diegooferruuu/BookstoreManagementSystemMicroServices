@@ -19,13 +19,14 @@ namespace LibraryWeb.Pages.Clients
             var dto = await _api.GetByIdAsync(EditClientId, ct);
             if (dto == null) return RedirectToPage("Index");
             ClientId = dto.Id;
-            Client = new ClientUpdateDto { FirstName = dto.FirstName, LastName = dto.LastName, Email = dto.Email, Phone = dto.Phone, Address = dto.Address };
+            Client = new ClientUpdateDto { FirstName = dto.FirstName, LastName = dto.LastName, Ci = dto.Ci, Email = dto.Email, Phone = dto.Phone, Address = dto.Address };
             return Page();
         }
         public async Task<IActionResult> OnPostAsync(CancellationToken ct)
         {
             Client.FirstName = Client.FirstName?.Trim() ?? string.Empty;
             Client.LastName = Client.LastName?.Trim() ?? string.Empty;
+            Client.Ci = Client.Ci?.Trim() ?? string.Empty;
             Client.Email = Client.Email?.Trim();
             Client.Phone = Client.Phone?.Trim();
             Client.Address = Client.Address?.Trim();
@@ -35,8 +36,20 @@ namespace LibraryWeb.Pages.Clients
             if (!result.Success)
             {
                 foreach (var kv in result.Errors)
+                {
+                    var key = kv.Key switch
+                    {
+                        "firstName" => "Client.FirstName",
+                        "lastName" => "Client.LastName",
+                        "ci" => "Client.Ci",
+                        "email" => "Client.Email",
+                        "phone" => "Client.Phone",
+                        "address" => "Client.Address",
+                        _ => $"Client.{kv.Key}"
+                    };
                     foreach (var msg in kv.Value)
-                        ModelState.AddModelError($"Client.{kv.Key}", msg);
+                        ModelState.AddModelError(key, msg);
+                }
                 if (!result.Errors.Any()) ModelState.AddModelError(string.Empty, "Error desconocido al actualizar cliente.");
                 return Page();
             }
