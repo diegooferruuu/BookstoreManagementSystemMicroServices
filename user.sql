@@ -18,27 +18,16 @@ CREATE TABLE public.users (
 	created_by varchar(100) NULL
 );
 
--- public.users definition
+-- public.roles definition
 
 -- Drop table
 
--- DROP TABLE public.users;
+-- DROP TABLE public.roles;
 
-CREATE TABLE public.users (
+CREATE TABLE public.roles (
 	id uuid DEFAULT gen_random_uuid() NOT NULL,
-	username text NOT NULL,
-	email text NOT NULL,
-	first_name text NULL,
-	last_name text NULL,
-	middle_name text NULL,
-	password_hash text NOT NULL,
-	is_active bool DEFAULT true NOT NULL,
-	must_change_password bool DEFAULT true NOT NULL,
-	created_at timestamp NULL,
-	created_by varchar(100) NULL
+	"name" text NOT NULL
 );
-
-
 -- public.user_roles definition
 
 -- Drop table
