@@ -72,6 +72,7 @@ namespace MicroServiceClient.Infrastructure.Repositories
             using var reader = cmd.ExecuteReader();
 
             int colId = reader.GetOrdinal("id");
+            int colCi = reader.GetOrdinal("ci");
             int colFirstName = reader.GetOrdinal("first_name");
             int colLastName = reader.GetOrdinal("last_name");
             int colEmail = reader.GetOrdinal("email");
@@ -84,6 +85,7 @@ namespace MicroServiceClient.Infrastructure.Repositories
                 clients.Add(new Client
                 {
                     Id = reader.GetGuid(colId),
+                    Ci = reader.IsDBNull(colCi) ? string.Empty : reader.GetString(colCi),
                     FirstName = reader.GetString(colFirstName),
                     LastName = reader.GetString(colLastName),
                     Email = reader.IsDBNull(colEmail) ? null : reader.GetString(colEmail),
@@ -127,8 +129,13 @@ namespace MicroServiceClient.Infrastructure.Repositories
             using var conn = _database.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO clients (first_name, last_name, email, phone, address)
-                VALUES (@first_name, @last_name, @email, @phone, @address)";
+                INSERT INTO clients (ci, first_name, last_name, email, phone, address)
+                VALUES (@ci, @first_name, @last_name, @email, @phone, @address)";
+
+            var paramCi = cmd.CreateParameter();
+            paramCi.ParameterName = "@ci";
+            paramCi.Value = client.Ci;
+            cmd.Parameters.Add(paramCi);
 
             var paramFirstName = cmd.CreateParameter();
             paramFirstName.ParameterName = "@first_name";
@@ -164,6 +171,7 @@ namespace MicroServiceClient.Infrastructure.Repositories
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 UPDATE clients SET 
+                    ci = @ci,
                     first_name = @first_name,
                     last_name = @last_name,
                     email = @email,
@@ -175,6 +183,11 @@ namespace MicroServiceClient.Infrastructure.Repositories
             paramId.ParameterName = "@id";
             paramId.Value = client.Id;
             cmd.Parameters.Add(paramId);
+
+            var paramCi = cmd.CreateParameter();
+            paramCi.ParameterName = "@ci";
+            paramCi.Value = client.Ci;
+            cmd.Parameters.Add(paramCi);
 
             var paramFirstName = cmd.CreateParameter();
             paramFirstName.ParameterName = "@first_name";
@@ -218,11 +231,38 @@ namespace MicroServiceClient.Infrastructure.Repositories
             cmd.ExecuteNonQuery();
         }
 
+        public bool ExistsByCi(string ci, Guid? excludeId = null)
+        {
+            using var conn = _database.GetConnection();
+            using var cmd = conn.CreateCommand();
+            if (excludeId.HasValue)
+            {
+                cmd.CommandText = "SELECT 1 FROM clients WHERE ci = @ci AND id <> @id AND is_active = TRUE LIMIT 1";
+                var pId = cmd.CreateParameter();
+                pId.ParameterName = "@id";
+                pId.Value = excludeId.Value;
+                cmd.Parameters.Add(pId);
+            }
+            else
+            {
+                cmd.CommandText = "SELECT 1 FROM clients WHERE ci = @ci AND is_active = TRUE LIMIT 1";
+            }
+
+            var pCi = cmd.CreateParameter();
+            pCi.ParameterName = "@ci";
+            pCi.Value = ci;
+            cmd.Parameters.Add(pCi);
+
+            using var reader = cmd.ExecuteReader();
+            return reader.Read();
+        }
+
         private static Client MapClient(System.Data.IDataReader reader)
         {
             return new Client
             {
                 Id = reader.GetGuid(reader.GetOrdinal("id")),
+                Ci = reader.IsDBNull(reader.GetOrdinal("ci")) ? string.Empty : reader.GetString(reader.GetOrdinal("ci")),
                 FirstName = reader.GetString(reader.GetOrdinal("first_name")),
                 LastName = reader.GetString(reader.GetOrdinal("last_name")),
                 Email = reader.IsDBNull(reader.GetOrdinal("email")) ? null : reader.GetString(reader.GetOrdinal("email")),

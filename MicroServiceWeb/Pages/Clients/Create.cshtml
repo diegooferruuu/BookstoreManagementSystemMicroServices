@@ -17,6 +17,11 @@
         <span class="text-danger" asp-validation-for="Client.LastName"></span>
     </div>
     <div class="mb-3">
+        <label asp-for="Client.Ci" class="form-label"></label>
+        <input asp-for="Client.Ci" class="form-control" pattern="^\d{5,10}(-(LP|CB|SC|CH|OR|PT|TJ|BN|PD))?$" title="Solo dígitos (5-10) y extensión opcional: LP, CB, SC, CH, OR, PT, TJ, BN, PD" />
+        <span class="text-danger" asp-validation-for="Client.Ci"></span>
+    </div>
+    <div class="mb-3">
         <label asp-for="Client.Email" class="form-label"></label>
         <input asp-for="Client.Email" class="form-control" />
         <span class="text-danger" asp-validation-for="Client.Email"></span>
@@ -31,7 +36,9 @@
         <textarea asp-for="Client.Address" class="form-control"></textarea>
         <span class="text-danger" asp-validation-for="Client.Address"></span>
     </div>
-    <button type="submit" class="btn btn-primary">Crear</button>
-    <a asp-page="Index" class="btn btn-secondary">Cancelar</a>
+    <div class="d-flex justify-content-end gap-2">
+        <button type="submit" class="btn btn-primary">Crear</button>
+        <a asp-page="Index" class="btn btn-secondary">Cancelar</a>
+    </div>
 </form>
 @section Scripts { <partial name="Shared/_ValidationScriptsPartial" /> }

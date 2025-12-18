@@ -14,6 +14,8 @@ namespace MicroServiceClient.Domain.Validations
         private static readonly Regex EmailPattern = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex PhoneDigits = new(@"^\d{8}$", RegexOptions.Compiled);
         private static readonly Regex SentenceCleaner = new(@"\s+", RegexOptions.Compiled);
+        // CI Bolivia: 5-10 dígitos, opcional -EXT con EXT ∈ {LP, CB, SC, CH, OR, PT, TJ, BN, PD}
+        private static readonly Regex BoliviaCi = new(@"^\d{5,10}(-(LP|CB|SC|CH|OR|PT|TJ|BN|PD))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static string NormalizeSpaces(string? s)
         {
@@ -57,6 +59,18 @@ namespace MicroServiceClient.Domain.Validations
         {
             if (string.IsNullOrWhiteSpace(s)) return false;
             return PhoneDigits.IsMatch(s);
+        }
+
+        public static bool IsValidBoliviaCi(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            return BoliviaCi.IsMatch(s);
+        }
+
+        public static string NormalizeCi(string? ci)
+        {
+            var norm = NormalizeSpaces(ci).ToUpperInvariant();
+            return norm;
         }
 
         public static bool IsValidProductDescriptionLoose(string? s)
