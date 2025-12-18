@@ -26,6 +26,10 @@
         "Path": "MicroServiceDistributors\\MicroServiceDistributors\\MicroServiceDistributors.API.csproj",
         "Action": "Start",
         "DebugTarget": "MicroServiceDistributors.API"
+      },
+      {
+        "Path": "MicroServiceReports\\MicroServiceReports\\MicroServiceReports.csproj",
+        "Action": "Start"
       }
     ]
   }

@@ -27,7 +27,7 @@ builder.Services.Configure<RequestLocalizationOptions>(options => { options.Defa
 // === Registro de HttpClients para microservicios ===
 builder.Services.AddHttpClient("ProductsService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Products"] ?? "https://localhost:57307/"))
                 .AddHttpMessageHandler<AuthHeaderHandler>();
-builder.Services.AddHttpClient("SalesService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Sales"] ?? "http://localhost:50400/"))
+builder.Services.AddHttpClient("SalesService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Sales"] ?? "https://placeholder-sales"))
                 .AddHttpMessageHandler<AuthHeaderHandler>();
 builder.Services.AddHttpClient("UsersService", c => c.BaseAddress = new Uri(builder.Configuration["Services:Users"] ?? "https://placeholder-users"))
                 .AddHttpMessageHandler<AuthHeaderHandler>();
